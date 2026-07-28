@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE / Editor files
+.vscode/
+.idea/
+*.user
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local helper / planning docs (not for GitHub)
+instructions.md
+design.md
+working.md
+tech_stack.md
+remember.md
+future_scope.md
+task.md
+implementation_plan.md
+walkthrough.md
