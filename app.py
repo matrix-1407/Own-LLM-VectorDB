@@ -1,17 +1,15 @@
 """
-VectorDB — FastAPI Server (v3.0.0 — Phase 4)
+VectorDB — FastAPI Server (v4.0.0 — Phase 5)
 =============================================
-Python vector database engine.
+Python vector database engine & introspection studio.
 Serves the web UI at http://localhost:8080 and exposes a full REST API.
 
-Phase 4 additions:
-  - Semantic Chunking with sentence embedding distance boundary detection
-  - POST /doc/semantic-chunk-preview  — interactive sentence distance curve
-  - Two-Stage Re-ranking (CrossScoreReranker & LLMReranker pointwise grading)
-  - POST /doc/rerank                  — standalone candidate reranker
-  - Sentence-Level Grounding & Interactive Citations (hallucination detection)
-  - HyDE (Hypothetical Document Embeddings) query expansion
-  - POST /doc/advanced-ask            — unified multi-pipeline RAG endpoint
+Phase 5 additions:
+  - GET /items/3d                   — 3D PCA coordinates for interactive visualizer
+  - GET /hnsw/trace                 — step-by-step greedy search trajectory across layers
+  - GET /hnsw/topology              — full multi-layer HNSW graph topology
+  - GET /analytics/clusters         — 3D cluster centroids, radii & variances
+  - GET /analytics/metric-compare   — Cosine vs Euclidean vs Manhattan ranking comparison
 """
 
 import logging
@@ -68,16 +66,12 @@ async def lifespan(application: FastAPI):
     """
     # ── Startup ───────────────────────────────────────────────────────────────
 
-    # Restore persisted document index (RAG chunks survive restarts)
     loaded_docs = load_document_db(doc_db, DOCUMENT_SNAPSHOT)
 
-    # Seed demo vectors — always start fresh from DEMO_VECTORS so the demo
-    # experience is consistent, but also try to restore any user-inserted demos.
     dist_fn = get_dist_fn("cosine")
     for metadata, category, emb in DEMO_VECTORS:
         db.insert(metadata, category, emb, dist_fn)
 
-    # Restore any extra demo vectors the user inserted during a previous session.
     if VECTOR_SNAPSHOT.exists():
         import json
         try:
@@ -91,11 +85,11 @@ async def lifespan(application: FastAPI):
             logger.warning("[Startup] Could not restore extra demo vectors: %s", exc)
 
     ollama_status = "ONLINE" if ollama.is_available() else "OFFLINE"
-    print("\n=== VectorDB Engine (Phase 4 — Advanced RAG) ===")
+    print("\n=== VectorDB Engine (Phase 5 — Visualization & Introspection) ===")
     print("http://localhost:8080")
     print(f"{len(db)} demo vectors | {DIMS} dims | HNSW + KD-Tree + BruteForce + SQ8")
     print(f"Documents loaded: {loaded_docs} chunks | Hybrid Search (BM25 + HNSW + RRF)")
-    print(f"Advanced RAG: Semantic Chunking | 2-Stage Re-ranking | Grounding & Citations | HyDE")
+    print("Introspection: 3D Manifold | Stacked HNSW Graph | Trajectory Tracer | Metric Geometry")
     print(f"Ollama: {ollama_status}")
     if ollama_status == "ONLINE":
         print(f"  embed: {ollama.embed_model}  gen: {ollama.gen_model}")
@@ -112,7 +106,7 @@ async def lifespan(application: FastAPI):
 
 # ── App & Middleware ───────────────────────────────────────────────────────────
 
-app = FastAPI(title="VectorDB", version="3.0.0", lifespan=lifespan)
+app = FastAPI(title="VectorDB", version="4.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -239,9 +233,14 @@ def items():
     ]
 
 
+@app.get("/items/3d")
+def items_3d():
+    """Phase 5: Returns all items with 3D PCA coordinates."""
+    return db.items_3d()
+
+
 @app.get("/categories")
 def categories():
-    """Return the unique category labels present in the demo vector index."""
     return {"categories": db.categories()}
 
 
@@ -268,26 +267,82 @@ def hnsw_info():
     return db.hnsw_info()
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# PHASE 5: INTROSPECTION & TRAJECTORY TRACING ENDPOINTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/hnsw/trace")
+def hnsw_trace(
+    v: str = Query(...),
+    k: int = Query(5),
+    metric: str = Query("cosine"),
+    ef: int = Query(50),
+):
+    """
+    Phase 5: Records the step-by-step traversal path of HNSW search
+    from the entry point through all graph layers down to Layer 0.
+    """
+    query = _parse_vec(v)
+    if len(query) != DIMS:
+        raise HTTPException(400, f"Expected {DIMS}-dimensional vector")
+    return db.search_with_trace(query, k, metric=metric, ef=ef)
+
+
+@app.get("/hnsw/topology")
+def hnsw_topology():
+    """
+    Phase 5: Returns full multi-layer HNSW graph topology with 3D coordinates.
+    """
+    info = db.hnsw_info()
+    items_3d_data = db.items_3d()
+    coords_map = {it["id"]: it["coords3d"] for it in items_3d_data}
+
+    # Enrich nodes with 3D coords
+    for n in info.get("nodes", []):
+        n["coords3d"] = coords_map.get(n["id"], [0.0, 0.0, 0.0])
+
+    return info
+
+
+@app.get("/analytics/clusters")
+def analytics_clusters():
+    """
+    Phase 5: Computes 3D cluster centroids, radii, and intra-cluster variances.
+    """
+    return db.cluster_analytics()
+
+
+@app.get("/analytics/metric-compare")
+def analytics_metric_compare(
+    v: str = Query(...),
+    k: int = Query(5),
+):
+    """
+    Phase 5: Compares neighborhood ranking across Cosine, Euclidean, and Manhattan metrics.
+    """
+    query = _parse_vec(v)
+    if len(query) != DIMS:
+        raise HTTPException(400, f"Expected {DIMS}-dimensional vector")
+    return db.compare_metrics(query, k=k)
+
+
 @app.get("/stats")
 def stats():
-    """Extended statistics including Phase 3 & 4 info."""
+    """Extended statistics including Phase 3, 4 & 5 capabilities."""
     sq8 = db.sq8_stats()
     doc_sq8 = doc_db.sq8_stats()
     bm25 = doc_db.bm25_stats()
     return {
-        # Core counts
         "count": len(db),
         "dims": DIMS,
         "algorithms": ["bruteforce", "kdtree", "hnsw"],
         "metrics": ["euclidean", "cosine", "manhattan"],
-        # Phase 3 — SQ8 demo index
         "sq8": {
             "compressionRatio": sq8.get("compressionRatio", 4.0),
             "savedBytes": sq8.get("savedBytes", 0),
             "float32Bytes": sq8.get("float32Bytes", 0),
             "int8Bytes": sq8.get("int8Bytes", 0),
         },
-        # Phase 3/4 — Document index
         "docIndex": {
             "chunkCount": len(doc_db),
             "bm25DocCount": bm25["docCount"],
@@ -295,11 +350,11 @@ def stats():
             "sq8CompressionRatio": doc_sq8.get("compressionRatio", 4.0),
             "sq8SavedBytes": doc_sq8.get("savedBytes", 0),
         },
-        "phase4": {
-            "pipelines": ["vector", "hybrid", "rerank", "hyde"],
-            "chunkingStrategies": ["fixed", "semantic"],
-            "rerankers": ["cross", "llm"],
-            "groundingEnabled": True,
+        "phase5": {
+            "visualizer3D": True,
+            "hnswTrajectoryTracer": True,
+            "stackedGraphInspector": True,
+            "metricSpaceGeometry": True,
         },
     }
 
@@ -310,7 +365,6 @@ def stats():
 
 @app.post("/persist/save")
 def persist_save():
-    """Manually trigger saving both indexes to disk."""
     n_vec = save_vector_db(db, VECTOR_SNAPSHOT)
     n_doc = save_document_db(doc_db, DOCUMENT_SNAPSHOT)
     return {
@@ -324,7 +378,6 @@ def persist_save():
 
 @app.get("/persist/status")
 def persist_status():
-    """Return info about the on-disk snapshot files."""
     return {
         "vectorSnapshot": snapshot_info(VECTOR_SNAPSHOT),
         "documentSnapshot": snapshot_info(DOCUMENT_SNAPSHOT),
@@ -332,14 +385,11 @@ def persist_status():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# DOCUMENT & ADVANCED RAG ENDPOINTS (Phase 4)
+# DOCUMENT & ADVANCED RAG ENDPOINTS
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.post("/doc/insert")
 def doc_insert(body: DocInsertBody):
-    """
-    Inserts a document using either Fixed Word Chunking or Semantic Chunking.
-    """
     if not body.title or not body.text:
         raise HTTPException(400, "title and text are required")
 
@@ -378,10 +428,6 @@ def doc_insert(body: DocInsertBody):
 
 @app.post("/doc/semantic-chunk-preview")
 def doc_semantic_chunk_preview(body: SemanticChunkPreviewBody):
-    """
-    Phase 4: Diagnostic preview of Semantic Chunking.
-    Returns sentence distance curves and split boundaries for UI visualization.
-    """
     if not body.text:
         raise HTTPException(400, "text is required")
     if not ollama.is_available():
@@ -436,7 +482,6 @@ async def doc_search(request: Request):
 
 @app.post("/doc/hybrid-search")
 def doc_hybrid_search(body: HybridSearchBody):
-    """Hybrid BM25 + HNSW search via Reciprocal Rank Fusion."""
     if not body.question:
         raise HTTPException(400, "question is required")
 
@@ -469,9 +514,6 @@ def doc_hybrid_search(body: HybridSearchBody):
 
 @app.post("/doc/rerank")
 def doc_rerank(body: RerankTestBody):
-    """
-    Phase 4: Standalone test endpoint for Candidate Re-ranking.
-    """
     if not body.query:
         raise HTTPException(400, "query is required")
     if len(doc_db) == 0:
@@ -508,16 +550,6 @@ def doc_rerank(body: RerankTestBody):
 
 @app.post("/doc/advanced-ask")
 def doc_advanced_ask(body: AdvancedAskBody):
-    """
-    Phase 4: Unified Advanced RAG Pipeline Endpoint.
-
-    Executes:
-    1. Multi-pipeline retrieval (Vector / Hybrid / Re-ranking / HyDE)
-    2. Context assembly & prompt grounding
-    3. LLM answer generation (llama3.2)
-    4. Sentence-level grounding & hallucination detection
-    5. Interactive citation mapping
-    """
     if not body.question:
         raise HTTPException(400, "question is required")
     if not ollama.is_available():
@@ -525,7 +557,6 @@ def doc_advanced_ask(body: AdvancedAskBody):
 
     t_start = time.perf_counter()
 
-    # ── Stage 1 & 2: Advanced Retrieval ──────────────────────────────────────
     t_ret_0 = time.perf_counter()
     adv_res = doc_db.advanced_search(
         query_text=body.question,
@@ -539,7 +570,6 @@ def doc_advanced_ask(body: AdvancedAskBody):
 
     retrieved_items = [doc for _, doc in adv_res.results]
 
-    # ── Stage 3: Prompt Construction & LLM Generation ────────────────────────
     t_gen_0 = time.perf_counter()
     if retrieved_items:
         context_str = "\n\n".join(
@@ -559,7 +589,6 @@ def doc_advanced_ask(body: AdvancedAskBody):
     answer = ollama.generate(prompt)
     t_gen_ms = round((time.perf_counter() - t_gen_0) * 1000, 1)
 
-    # ── Stage 4: Sentence Grounding & Citation Extraction ─────────────────────
     t_gnd_0 = time.perf_counter()
     grounding_data = None
     if body.grounding and retrieved_items and not answer.startswith("ERROR"):
@@ -622,7 +651,6 @@ def doc_advanced_ask(body: AdvancedAskBody):
     }
 
 
-# Standard backward-compatible doc/ask endpoint
 @app.post("/doc/ask")
 def doc_ask(body: DocAskBody):
     adv_body = AdvancedAskBody(question=body.question, k=body.k, pipeline="vector", grounding=False)

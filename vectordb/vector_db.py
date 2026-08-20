@@ -11,6 +11,13 @@ Phase 3 additions
 - search_filtered()  — HNSW/KDTree/BruteForce search with optional
                        category-string metadata filter (single-stage).
 - sq8_stats()        — Returns SQ8Index compression stats for the demo store.
+
+Phase 5 additions
+-----------------
+- search_with_trace() — HNSW search returning step-by-step traversal hops.
+- items_3d()          — 3D PCA coordinates for interactive 3D visualizer.
+- cluster_analytics() — Category centroids, radii, and intra-cluster variances.
+- compare_metrics()   — Neighborhood comparison across Cosine, Euclidean, and Manhattan.
 """
 
 import threading
@@ -18,10 +25,15 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
-from vectordb.metrics import get_dist_fn, DistFn, cosine
 from vectordb.algorithms.brute_force import BruteForce, VectorItem
-from vectordb.algorithms.kd_tree import KDTree
 from vectordb.algorithms.hnsw import HNSW
+from vectordb.algorithms.kd_tree import KDTree
+from vectordb.manifold import (
+    compare_metric_neighborhoods,
+    compute_cluster_centroids,
+    pca_3d,
+)
+from vectordb.metrics import DistFn, cosine, get_dist_fn
 from vectordb.quantization import SQ8Index
 
 
@@ -139,6 +151,45 @@ class VectorDB:
                     )
             return SearchResult(hits=hits, latency_us=latency_us, algo=algo, metric=metric)
 
+    # ── Search with Trajectory Trace (Phase 5) ────────────────────────────────
+
+    def search_with_trace(
+        self,
+        query: List[float],
+        k: int,
+        metric: str = "cosine",
+        ef: int = 50,
+    ) -> dict:
+        """
+        Executes HNSW search while recording the step-by-step traversal path
+        across all graph layers for interactive animation.
+        """
+        with self._lock:
+            dist_fn = get_dist_fn(metric)
+            t0 = time.perf_counter_ns()
+            raw, trace = self._hnsw.search_with_trace(query, k, ef=ef, dist_fn=dist_fn)
+            latency_us = (time.perf_counter_ns() - t0) // 1000
+
+            hits = []
+            for d, id_ in raw:
+                if id_ in self._store:
+                    item = self._store[id_]
+                    hits.append({
+                        "id": id_,
+                        "metadata": item.metadata,
+                        "category": item.category,
+                        "distance": round(d, 5),
+                    })
+
+            return {
+                "results": hits,
+                "trace": trace,
+                "latencyUs": latency_us,
+                "metric": metric,
+                "topLayer": self._hnsw._top_layer,
+                "entryPoint": self._hnsw._entry,
+            }
+
     # ── Filtered Search (Phase 3) ─────────────────────────────────────────────
 
     def search_filtered(
@@ -149,21 +200,11 @@ class VectorDB:
         algo: str,
         category_filter: Optional[str] = None,
     ) -> SearchResult:
-        """
-        Run a nearest-neighbor search then apply a category filter post-hoc.
-
-        Strategy: oversample by 5× (up to all items), then filter.
-        This single-stage approach keeps index traversal simple while
-        ensuring enough candidates are returned after filtering.
-
-        If category_filter is None or empty, behaves identically to search().
-        """
         if not category_filter:
             return self.search(query, k, metric, algo)
 
         with self._lock:
             dist_fn = get_dist_fn(metric)
-            # Oversample to compensate for filtered-out candidates
             oversample = min(k * 5, len(self._store))
             oversample = max(oversample, k)
 
@@ -215,6 +256,45 @@ class VectorDB:
                 item_count=len(self._store),
             )
 
+    # ── 3D Manifold & Introspection (Phase 5) ─────────────────────────────────
+
+    def items_3d(self) -> List[dict]:
+        """
+        Returns all vector items enriched with 3D PCA coordinates [x, y, z]
+        for the interactive 3D visualizer.
+        """
+        with self._lock:
+            items = list(self._store.values())
+            if not items:
+                return []
+            embs = [it.emb for it in items]
+            coords = pca_3d(embs)
+
+            result = []
+            for i, it in enumerate(items):
+                result.append({
+                    "id": it.id,
+                    "metadata": it.metadata,
+                    "category": it.category,
+                    "embedding": it.emb,
+                    "coords3d": coords[i] if i < len(coords) else [0.0, 0.0, 0.0],
+                })
+            return result
+
+    def cluster_analytics(self) -> dict:
+        """Computes 3D centroids, radii, and intra-cluster variances."""
+        items_with_coords = self.items_3d()
+        return compute_cluster_centroids(items_with_coords)
+
+    def compare_metrics(self, query: List[float], k: int = 5) -> dict:
+        """Compares top-K neighborhoods under Cosine, Euclidean, and Manhattan metrics."""
+        with self._lock:
+            items = [
+                {"id": it.id, "metadata": it.metadata, "embedding": it.emb}
+                for it in self._store.values()
+            ]
+            return compare_metric_neighborhoods(query, items, k=k)
+
     # ── Accessors ─────────────────────────────────────────────────────────────
 
     def all_items(self) -> List[VectorItem]:
@@ -226,12 +306,10 @@ class VectorDB:
             return self._hnsw.get_info()
 
     def sq8_stats(self) -> dict:
-        """Return SQ8 compression statistics for the demo index."""
         with self._lock:
             return self._sq8.stats()
 
     def categories(self) -> List[str]:
-        """Return sorted list of unique category values."""
         with self._lock:
             return sorted({item.category for item in self._store.values()})
 

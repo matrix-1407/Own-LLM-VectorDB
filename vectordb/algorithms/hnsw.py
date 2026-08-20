@@ -1,7 +1,18 @@
-import math
+"""
+vectordb/algorithms/hnsw.py
+===========================
+Hierarchical Navigable Small World (HNSW) approximate nearest-neighbor graph index.
+
+Phase 5 additions
+-----------------
+- search_with_trace() — step-by-step search trajectory recording across layers.
+- get_full_topology() — complete layer-by-layer graph export for 3D inspection.
+"""
+
 import heapq
+import math
 import random
-from typing import Dict, List, Tuple, Optional, Callable
+from typing import Callable, Dict, List, Optional, Tuple
 
 DistFn = Callable[[List[float], List[float]], float]
 
@@ -34,11 +45,11 @@ class HNSW:
     def _rand_level(self) -> int:
         return int(math.floor(-math.log(self._rng.random()) * self.mL))
 
-    def _search_layer(self, query: List[float], ep: int, ef: int,
-                      layer: int, dist_fn: DistFn) -> List[Tuple[float, int]]:
+    def _search_layer(
+        self, query: List[float], ep: int, ef: int, layer: int, dist_fn: DistFn
+    ) -> List[Tuple[float, int]]:
         visited = {ep}
         d0 = dist_fn(query, self._G[ep]["emb"])
-        # min-heap for candidates, max-heap (negated) for found
         cands = [(d0, ep)]
         found = [(-d0, ep)]
 
@@ -71,11 +82,16 @@ class HNSW:
 
     # ── Insert ─────────────────────────────────────────────────────────────────
 
-    def insert(self, id_: int, metadata: str, category: str, emb: List[float], dist_fn: DistFn) -> None:
+    def insert(
+        self, id_: int, metadata: str, category: str, emb: List[float], dist_fn: DistFn
+    ) -> None:
         lvl = self._rand_level()
         self._G[id_] = {
-            "emb": emb, "meta": metadata, "cat": category,
-            "max_lyr": lvl, "nbrs": [[] for _ in range(lvl + 1)]
+            "emb": emb,
+            "meta": metadata,
+            "cat": category,
+            "max_lyr": lvl,
+            "nbrs": [[] for _ in range(lvl + 1)],
         }
 
         if self._entry is None:
@@ -105,9 +121,11 @@ class HNSW:
                 conn = node["nbrs"][lc]
                 conn.append(id_)
                 if len(conn) > max_m:
-                    # Trim to max_m nearest neighbors
-                    scored = [(dist_fn(node["emb"], self._G[c]["emb"]), c)
-                              for c in conn if c in self._G]
+                    scored = [
+                        (dist_fn(node["emb"], self._G[c]["emb"]), c)
+                        for c in conn
+                        if c in self._G
+                    ]
                     scored.sort(key=lambda x: x[0])
                     node["nbrs"][lc] = [c for _, c in scored[:max_m]]
 
@@ -120,7 +138,9 @@ class HNSW:
 
     # ── K-NN Search ────────────────────────────────────────────────────────────
 
-    def knn(self, query: List[float], k: int, ef: int, dist_fn: DistFn) -> List[Tuple[float, int]]:
+    def knn(
+        self, query: List[float], k: int, ef: int, dist_fn: DistFn
+    ) -> List[Tuple[float, int]]:
         if self._entry is None:
             return []
         ep = self._entry
@@ -131,6 +151,138 @@ class HNSW:
                     ep = W[0][1]
         W = self._search_layer(query, ep, max(ef, k), 0, dist_fn)
         return W[:k]
+
+    # ── Search Trajectory Tracer (Phase 5) ────────────────────────────────────
+
+    def search_with_trace(
+        self, query: List[float], k: int, ef: int, dist_fn: DistFn
+    ) -> Tuple[List[Tuple[float, int]], List[dict]]:
+        """
+        Executes K-NN search while recording a step-by-step trace of greedy hops
+        across layers, layer-drop events, and candidate evaluations for Phase 5 visualization.
+        """
+        if self._entry is None or not self._G:
+            return [], []
+
+        trace: List[dict] = []
+        step_counter = 0
+
+        ep = self._entry
+        d_ep = dist_fn(query, self._G[ep]["emb"])
+        trace.append({
+            "step": step_counter,
+            "layer": self._top_layer,
+            "type": "entry",
+            "nodeId": ep,
+            "metadata": self._G[ep]["meta"],
+            "category": self._G[ep]["cat"],
+            "dist": round(d_ep, 5),
+            "description": f"Entry point at top layer L{self._top_layer}: Node #{ep} ({self._G[ep]['meta']})",
+        })
+        step_counter += 1
+
+        # Upper layers (greedy 1-NN search)
+        for lc in range(self._top_layer, 0, -1):
+            changed = True
+            while changed:
+                changed = False
+                node = self._G.get(ep)
+                if node is None or lc >= len(node["nbrs"]):
+                    break
+                for nid in node["nbrs"][lc]:
+                    if nid not in self._G:
+                        continue
+                    nd = dist_fn(query, self._G[nid]["emb"])
+                    if nd < d_ep:
+                        trace.append({
+                            "step": step_counter,
+                            "layer": lc,
+                            "type": "hop",
+                            "fromNode": ep,
+                            "toNode": nid,
+                            "nodeId": nid,
+                            "metadata": self._G[nid]["meta"],
+                            "category": self._G[nid]["cat"],
+                            "dist": round(nd, 5),
+                            "prevDist": round(d_ep, 5),
+                            "description": f"Layer L{lc} greedy hop: #{ep} -> #{nid} ({round(d_ep,4)} -> {round(nd,4)})",
+                        })
+                        step_counter += 1
+                        d_ep = nd
+                        ep = nid
+                        changed = True
+                        break
+
+            # Drop to next layer
+            trace.append({
+                "step": step_counter,
+                "layer": lc - 1,
+                "type": "layer_drop",
+                "nodeId": ep,
+                "metadata": self._G[ep]["meta"],
+                "category": self._G[ep]["cat"],
+                "dist": round(d_ep, 5),
+                "description": f"Dropped from Layer L{lc} to Layer L{lc-1} at Node #{ep}",
+            })
+            step_counter += 1
+
+        # Ground Layer L0 beam search with ef
+        visited = {ep}
+        cands = [(d_ep, ep)]
+        found = [(-d_ep, ep)]
+
+        while cands:
+            cd, cid = heapq.heappop(cands)
+            worst = -found[0][0]
+            if cd > worst and len(found) >= ef:
+                break
+            node = self._G.get(cid)
+            if node is None or len(node["nbrs"]) == 0:
+                continue
+            for nid in node["nbrs"][0]:
+                if nid in visited or nid not in self._G:
+                    continue
+                visited.add(nid)
+                nd = dist_fn(query, self._G[nid]["emb"])
+                worst = -found[0][0]
+                if len(found) < ef or nd < worst:
+                    heapq.heappush(cands, (nd, nid))
+                    heapq.heappush(found, (-nd, nid))
+                    if len(found) > ef:
+                        heapq.heappop(found)
+                    trace.append({
+                        "step": step_counter,
+                        "layer": 0,
+                        "type": "explore",
+                        "fromNode": cid,
+                        "toNode": nid,
+                        "nodeId": nid,
+                        "metadata": self._G[nid]["meta"],
+                        "category": self._G[nid]["cat"],
+                        "dist": round(nd, 5),
+                        "description": f"Layer L0 explored candidate #{nid} ({self._G[nid]['meta']}, dist {round(nd,4)})",
+                    })
+                    step_counter += 1
+
+        result = [(-d, id_) for d, id_ in found]
+        result.sort(key=lambda x: x[0])
+        final_top = result[:k]
+
+        for rank, (d, id_) in enumerate(final_top, start=1):
+            trace.append({
+                "step": step_counter,
+                "layer": 0,
+                "type": "result",
+                "rank": rank,
+                "nodeId": id_,
+                "metadata": self._G[id_]["meta"],
+                "category": self._G[id_]["cat"],
+                "dist": round(d, 5),
+                "description": f"Final Rank #{rank}: Node #{id_} ({self._G[id_]['meta']}, dist {round(d,4)})",
+            })
+            step_counter += 1
+
+        return final_top, trace
 
     # ── Delete ─────────────────────────────────────────────────────────────────
 
@@ -146,7 +298,7 @@ class HNSW:
             self._entry = remaining[0] if remaining else None
         del self._G[id_]
 
-    # ── Graph Introspection (for /hnsw-info API) ────────────────────────────────
+    # ── Graph Introspection (Phase 5) ──────────────────────────────────────────
 
     def get_info(self) -> dict:
         max_l = max(self._top_layer + 1, 1)
@@ -157,8 +309,10 @@ class HNSW:
 
         for id_, node in self._G.items():
             nodes_out.append({
-                "id": id_, "metadata": node["meta"],
-                "category": node["cat"], "maxLyr": node["max_lyr"]
+                "id": id_,
+                "metadata": node["meta"],
+                "category": node["cat"],
+                "maxLyr": node["max_lyr"],
             })
             for lc in range(min(node["max_lyr"] + 1, max_l)):
                 nodes_per_layer[lc] += 1
@@ -170,6 +324,7 @@ class HNSW:
 
         return {
             "topLayer": self._top_layer,
+            "entryPoint": self._entry,
             "nodeCount": len(self._G),
             "nodesPerLayer": nodes_per_layer,
             "edgesPerLayer": edges_per_layer,

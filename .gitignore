@@ -12,6 +12,9 @@ venv/
 .venv/
 env/
 
+# Data snapshots (auto-created on save)
+data/*.json
+
 # IDE / Editor files
 .vscode/
 .idea/
