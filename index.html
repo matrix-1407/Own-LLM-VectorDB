@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>VectorDB — HNSW + RAG + Hybrid Search</title>
+<title>VectorDB — HNSW + Hybrid Search + Advanced RAG Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
   --bg:     #07070f;
@@ -16,9 +16,10 @@
   --sports: #69f0ae;
   --accent: #6c63ff;
   --text:   #cdd6f4;
-  --muted:  #4a4a6a;
+  --muted:  #58587a;
   --red:    #f38ba8;
   --green:  #a6e3a1;
+  --yellow: #f9e2af;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -31,49 +32,51 @@ body {
 /* ── HEADER ── */
 header {
   background: var(--card); border-bottom: 1px solid var(--border);
-  padding: 10px 20px; display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+  padding: 10px 20px; display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
 }
 header h1 {
-  font-size: 17px; font-weight: 600; letter-spacing: 4px;
+  font-size: 16px; font-weight: 600; letter-spacing: 3px;
   background: linear-gradient(90deg, var(--cs), var(--accent), var(--math));
   -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
 }
-.badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; letter-spacing: 1px; border: 1px solid var(--border); color: var(--muted); }
+.badge { font-size: 10px; padding: 2px 7px; border-radius: 10px; letter-spacing: .5px; border: 1px solid var(--border); color: var(--muted); }
 .badge.hl { border-color: var(--accent); color: var(--accent); background: rgba(108,99,255,.12); }
 .badge.ok { border-color: var(--green); color: var(--green); background: rgba(166,227,161,.1); }
 .badge.err { border-color: var(--red); color: var(--red); background: rgba(243,139,168,.1); }
+.badge.p4 { border-color: rgba(179,136,255,.4); color: var(--math); background: rgba(179,136,255,.08); }
 #statsLabel { margin-left: auto; font-size: 11px; color: var(--muted); }
 
 /* ── LAYOUT ── */
 .layout { display: flex; flex: 1; overflow: hidden; }
-.left-panel { width: 260px; flex-shrink: 0; background: var(--card); border-right: 1px solid var(--border); overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 18px; }
+.left-panel { width: 260px; flex-shrink: 0; background: var(--card); border-right: 1px solid var(--border); overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 16px; }
 .center-panel { flex: 1; position: relative; overflow: hidden; }
 #scatter { display: block; width: 100%; height: 100%; }
-.right-panel { width: 360px; flex-shrink: 0; background: var(--card); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+.right-panel { width: 380px; flex-shrink: 0; background: var(--card); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
 
 /* ── TABS ── */
 .tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.tab { flex: 1; padding: 10px 6px; text-align: center; font-size: 10px; letter-spacing: 1px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; transition: all .2s; }
-.tab.on { color: var(--accent); border-bottom-color: var(--accent); }
-.tab-content { display: none; flex: 1; overflow-y: auto; padding: 16px; flex-direction: column; gap: 16px; }
+.tab { flex: 1; padding: 10px 4px; text-align: center; font-size: 10px; letter-spacing: 1px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; transition: all .2s; }
+.tab.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.tab-content { display: none; flex: 1; overflow-y: auto; padding: 14px; flex-direction: column; gap: 14px; }
 .tab-content.on { display: flex; }
 
 /* ── COMMON COMPONENTS ── */
-.sec { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.sec { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
 input[type=text], select, textarea {
   width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text);
-  padding: 9px 11px; border-radius: 6px; font-family: inherit; font-size: 12px; outline: none; transition: border-color .2s;
+  padding: 8px 10px; border-radius: 6px; font-family: inherit; font-size: 11px; outline: none; transition: border-color .2s;
 }
 input[type=text]:focus, select:focus, textarea:focus { border-color: var(--accent); }
-textarea { resize: vertical; min-height: 100px; line-height: 1.5; }
+textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
 select option { background: var(--card); }
 input[type=range] { width: 100%; accent-color: var(--accent); background: transparent; border: none; padding: 0; }
 button {
-  width: 100%; padding: 9px 14px; border: none; border-radius: 6px; cursor: pointer;
-  font-family: inherit; font-size: 12px; font-weight: 500; letter-spacing: .5px; transition: all .2s;
+  width: 100%; padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer;
+  font-family: inherit; font-size: 11px; font-weight: 500; letter-spacing: .5px; transition: all .2s;
 }
-.btn-p { background: linear-gradient(135deg, var(--accent), #4f46e5); color: #fff; box-shadow: 0 0 18px rgba(108,99,255,.3); }
-.btn-p:hover { box-shadow: 0 0 28px rgba(108,99,255,.55); transform: translateY(-1px); }
+.btn-p { background: linear-gradient(135deg, var(--accent), #4f46e5); color: #fff; box-shadow: 0 0 16px rgba(108,99,255,.3); }
+.btn-p:hover { box-shadow: 0 0 24px rgba(108,99,255,.5); transform: translateY(-1px); }
 .btn-p:disabled { opacity: .5; transform: none; cursor: wait; }
 .btn-s { background: var(--border); color: var(--text); }
 .btn-s:hover { background: #1c1c35; }
@@ -81,97 +84,107 @@ button {
 .btn-g { background: rgba(166,227,161,.12); color: var(--green); border: 1px solid rgba(166,227,161,.3); }
 .btn-g:hover { background: rgba(166,227,161,.22); }
 .btn-g:disabled { opacity: .5; cursor: wait; }
-
-.algo-row { display: flex; gap: 5px; }
-.algo-btn { flex: 1; padding: 7px 4px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); font-size: 10px; cursor: pointer; text-align: center; transition: all .2s; letter-spacing: .5px; font-family: inherit; }
-.algo-btn.on { border-color: var(--accent); color: var(--accent); background: rgba(108,99,255,.12); }
-
-.legend { display: flex; flex-direction: column; gap: 5px; }
-.leg-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
-.dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-
-/* ── RESULTS ── */
-.results { display: flex; flex-direction: column; gap: 7px; }
-.rcard { background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; animation: fadeUp .25s ease; }
-@keyframes fadeUp { from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)} }
-.rcard:hover { border-color: #252545; }
-.rrank { font-size: 9px; color: var(--muted); letter-spacing: 1px; margin-bottom: 3px; }
-.rmeta { font-size: 12px; line-height: 1.4; margin-bottom: 6px; }
-.rfoot { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-.rcat  { font-size: 9px; padding: 2px 7px; border-radius: 8px; letter-spacing: .5px; }
-.rdist { font-size: 10px; color: var(--muted); flex: 1; text-align: right; }
-.del   { background: rgba(243,139,168,.12); color: var(--red); border: 1px solid rgba(243,139,168,.25); border-radius: 4px; cursor: pointer; font-size: 10px; padding: 2px 7px; font-family: inherit; transition: background .2s; width: auto; }
-.del:hover { background: rgba(243,139,168,.25); }
-
-/* ── LATENCY / BENCH / LAYERS ── */
-.lat-big { font-size: 32px; font-weight: 600; color: var(--cs); text-shadow: 0 0 20px rgba(0,217,255,.4); }
-.lat-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
-.bench { display: flex; flex-direction: column; gap: 9px; }
-.brow  { display: flex; flex-direction: column; gap: 3px; }
-.blabel { display: flex; justify-content: space-between; font-size: 10px; }
-.btrack { height: 7px; background: var(--bg); border-radius: 4px; overflow: hidden; }
-.bfill  { height: 100%; border-radius: 4px; transition: width .5s ease; }
-.layers { display: flex; flex-direction: column; gap: 5px; }
-.lrow   { display: flex; align-items: center; gap: 7px; font-size: 10px; }
-.lnum   { width: 18px; text-align: right; color: var(--accent); }
-.ltrack { flex: 1; height: 5px; background: var(--bg); border-radius: 3px; overflow: hidden; }
-.lfill  { height: 100%; background: var(--accent); border-radius: 3px; opacity: .7; transition: width .4s; }
-.lcount { width: 80px; text-align: right; color: var(--muted); }
-#vecCvs { display: block; width: 100%; background: var(--bg); border-radius: 5px; }
-
-/* ── DOCUMENT LIST ── */
-.doc-list { display: flex; flex-direction: column; gap: 7px; }
-.dcard { background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; animation: fadeUp .25s ease; }
-.dcard-title { font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--green); }
-.dcard-preview { font-size: 10px; color: var(--muted); line-height: 1.5; margin-bottom: 6px; }
-.dcard-foot { display: flex; justify-content: space-between; align-items: center; }
-.dcard-words { font-size: 9px; color: var(--muted); }
-
-/* ── OLLAMA STATUS ── */
-.ollama-status { background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; font-size: 11px; line-height: 1.6; }
-.ollama-status.ok { border-color: rgba(166,227,161,.3); }
-.ollama-status.err { border-color: rgba(243,139,168,.3); }
-
-/* ── CHAT ── */
-.chat-history { display: flex; flex-direction: column; gap: 12px; }
-.chat-q { background: rgba(108,99,255,.12); border: 1px solid rgba(108,99,255,.25); border-radius: 7px; padding: 10px 12px; font-size: 12px; line-height: 1.5; }
-.chat-a { background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 12px; }
-.chat-a-label { font-size: 9px; letter-spacing: 2px; color: var(--green); margin-bottom: 6px; }
-.chat-a-text { font-size: 12px; line-height: 1.7; white-space: pre-wrap; }
-.chat-ctx { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
-.chat-ctx-label { font-size: 9px; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
-.ctx-chip { display: inline-block; font-size: 9px; padding: 2px 7px; border-radius: 10px; margin: 2px; background: rgba(108,99,255,.1); border: 1px solid rgba(108,99,255,.2); color: var(--accent); cursor: pointer; }
-.ctx-chip:hover { background: rgba(108,99,255,.2); }
-.ctx-expand { display: none; font-size: 10px; color: var(--muted); line-height: 1.5; margin-top: 6px; padding: 8px; background: #0a0a18; border-radius: 5px; }
-.thinking { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
-.spinner { width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.typing::after { content: '▋'; animation: blink 1s step-end infinite; }
-@keyframes blink { 50% { opacity: 0; } }
-
-/* ── TOOLTIP ── */
-#tip { position: fixed; display: none; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 7px 11px; font-size: 11px; pointer-events: none; max-width: 220px; z-index: 200; line-height: 1.5; }
-
-::-webkit-scrollbar { width: 3px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-/* ── PHASE 3: SYSTEM TAB ── */
-.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.stat-card { background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; }
-.stat-val  { font-size: 20px; font-weight: 600; color: var(--accent); margin-bottom: 2px; }
-.stat-lbl  { font-size: 9px; letter-spacing: 1px; color: var(--muted); }
-.persist-card { background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 12px; font-size: 11px; line-height: 1.8; }
-.persist-card.ok { border-color: rgba(166,227,161,.3); }
-.persist-card.no { border-color: rgba(108,99,255,.25); }
-
-/* ── PHASE 3: HYBRID TOGGLE ── */
-.mode-row { display: flex; gap: 5px; }
-.mode-btn { flex: 1; padding: 7px 4px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); font-size: 10px; cursor: pointer; text-align: center; transition: all .2s; letter-spacing: .5px; font-family: inherit; }
-.mode-btn.on { border-color: var(--green); color: var(--green); background: rgba(166,227,161,.1); }
 .btn-y { background: rgba(255,183,77,.12); color: var(--food); border: 1px solid rgba(255,183,77,.3); }
 .btn-y:hover { background: rgba(255,183,77,.22); }
 .btn-y:disabled { opacity:.5;cursor:wait; }
+.btn-m { background: rgba(179,136,255,.12); color: var(--math); border: 1px solid rgba(179,136,255,.3); }
+.btn-m:hover { background: rgba(179,136,255,.22); }
+
+.algo-row, .mode-row { display: flex; gap: 4px; }
+.algo-btn, .mode-btn { flex: 1; padding: 6px 3px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); font-size: 9px; cursor: pointer; text-align: center; transition: all .2s; letter-spacing: .3px; font-family: inherit; }
+.algo-btn.on, .mode-btn.on { border-color: var(--accent); color: var(--accent); background: rgba(108,99,255,.12); font-weight: 600; }
+.mode-btn.p4-on { border-color: var(--math); color: var(--math); background: rgba(179,136,255,.12); font-weight: 600; }
+
+.legend { display: flex; flex-direction: column; gap: 5px; }
+.leg-row { display: flex; align-items: center; gap: 7px; font-size: 10px; color: var(--muted); }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── RESULTS & CARDS ── */
+.results { display: flex; flex-direction: column; gap: 6px; }
+.rcard { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 9px 11px; animation: fadeUp .25s ease; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)} }
+.rcard:hover { border-color: #252545; }
+.rrank { font-size: 8px; color: var(--muted); letter-spacing: 1px; margin-bottom: 2px; }
+.rmeta { font-size: 11px; line-height: 1.4; margin-bottom: 5px; }
+.rfoot { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.rcat  { font-size: 8px; padding: 2px 6px; border-radius: 6px; letter-spacing: .5px; }
+.rdist { font-size: 9px; color: var(--muted); flex: 1; text-align: right; }
+.del   { background: rgba(243,139,168,.12); color: var(--red); border: 1px solid rgba(243,139,168,.25); border-radius: 4px; cursor: pointer; font-size: 9px; padding: 2px 6px; font-family: inherit; transition: background .2s; width: auto; }
+.del:hover { background: rgba(243,139,168,.25); }
+
+/* ── SYSTEM & METRICS ── */
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.stat-card { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
+.stat-val  { font-size: 18px; font-weight: 600; color: var(--accent); margin-bottom: 2px; }
+.stat-lbl  { font-size: 8px; letter-spacing: 1px; color: var(--muted); }
+.persist-card { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-size: 10px; line-height: 1.7; }
+.persist-card.ok { border-color: rgba(166,227,161,.3); }
+.persist-card.no { border-color: rgba(108,99,255,.25); }
+
+/* ── PHASE 4: GROUNDING & CITATIONS ── */
+.grounding-box { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin-top: 8px; }
+.grounding-meter { height: 6px; background: #141424; border-radius: 3px; overflow: hidden; margin: 6px 0; }
+.grounding-fill  { height: 100%; border-radius: 3px; transition: width .6s ease; }
+.sent-grounded   { border-bottom: 2px solid rgba(166,227,161,.5); cursor: pointer; transition: background .2s; }
+.sent-grounded:hover { background: rgba(166,227,161,.1); }
+.sent-partial    { border-bottom: 2px solid rgba(249,226,175,.5); cursor: pointer; }
+.sent-partial:hover { background: rgba(249,226,175,.1); }
+.sent-ungrounded { border-bottom: 2px solid rgba(243,139,168,.5); color: #f8a5c2; }
+.cit-tag { display: inline-block; font-size: 8px; font-weight: 600; color: var(--accent); background: rgba(108,99,255,.18); border-radius: 4px; padding: 0 4px; margin: 0 2px; cursor: pointer; }
+.cit-tag:hover { background: var(--accent); color: #fff; }
+.source-highlight { border-color: var(--accent) !important; background: rgba(108,99,255,.08) !important; box-shadow: 0 0 10px rgba(108,99,255,.2); }
+
+/* ── CHUNK PREVIEW CURVE ── */
+.curve-box { background: #05050c; border: 1px solid var(--border); border-radius: 6px; padding: 8px; margin-top: 8px; }
+.curve-bar-row { display: flex; align-items: flex-end; gap: 3px; height: 50px; padding-top: 4px; }
+.curve-bar { flex: 1; background: var(--accent); border-radius: 2px 2px 0 0; min-height: 2px; transition: height .3s; position: relative; }
+.curve-bar.split { background: var(--food); }
+
+/* ── LATENCY / BENCH / LAYERS ── */
+.lat-big { font-size: 28px; font-weight: 600; color: var(--cs); text-shadow: 0 0 16px rgba(0,217,255,.4); }
+.lat-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.bench { display: flex; flex-direction: column; gap: 7px; }
+.brow  { display: flex; flex-direction: column; gap: 2px; }
+.blabel { display: flex; justify-content: space-between; font-size: 9px; }
+.btrack { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.bfill  { height: 100%; border-radius: 3px; transition: width .5s ease; }
+.layers { display: flex; flex-direction: column; gap: 4px; }
+.lrow   { display: flex; align-items: center; gap: 6px; font-size: 9px; }
+.lnum   { width: 16px; text-align: right; color: var(--accent); }
+.ltrack { flex: 1; height: 4px; background: var(--bg); border-radius: 2px; overflow: hidden; }
+.lfill  { height: 100%; background: var(--accent); border-radius: 2px; opacity: .7; transition: width .4s; }
+.lcount { width: 70px; text-align: right; color: var(--muted); }
+#vecCvs { display: block; width: 100%; background: var(--bg); border-radius: 5px; }
+
+/* ── DOCUMENT LIST ── */
+.doc-list { display: flex; flex-direction: column; gap: 6px; }
+.dcard { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; animation: fadeUp .25s ease; transition: all .2s; }
+.dcard-title { font-size: 11px; font-weight: 500; margin-bottom: 3px; color: var(--green); }
+.dcard-preview { font-size: 9px; color: var(--muted); line-height: 1.4; margin-bottom: 5px; }
+.dcard-foot { display: flex; justify-content: space-between; align-items: center; }
+.dcard-words { font-size: 8px; color: var(--muted); }
+
+/* ── CHAT ── */
+.chat-history { display: flex; flex-direction: column; gap: 10px; }
+.chat-q { background: rgba(108,99,255,.12); border: 1px solid rgba(108,99,255,.25); border-radius: 6px; padding: 8px 10px; font-size: 11px; line-height: 1.5; }
+.chat-a { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px; }
+.chat-a-label { font-size: 8px; letter-spacing: 1.5px; color: var(--green); margin-bottom: 5px; }
+.chat-a-text { font-size: 11px; line-height: 1.6; white-space: pre-wrap; }
+.chat-ctx { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; }
+.chat-ctx-label { font-size: 8px; letter-spacing: 1px; color: var(--muted); margin-bottom: 5px; }
+.ctx-chip { display: inline-block; font-size: 8px; padding: 2px 6px; border-radius: 8px; margin: 2px; background: rgba(108,99,255,.1); border: 1px solid rgba(108,99,255,.2); color: var(--accent); cursor: pointer; }
+.ctx-chip:hover { background: rgba(108,99,255,.2); }
+.ctx-expand { display: none; font-size: 9px; color: var(--muted); line-height: 1.4; margin-top: 5px; padding: 6px; background: #0a0a18; border-radius: 4px; }
+.thinking { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--muted); }
+.spinner { width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.typing::after { content: '▋'; animation: blink 1s step-end infinite; }
+
+/* ── TOOLTIP ── */
+#tip { position: fixed; display: none; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 6px 9px; font-size: 10px; pointer-events: none; max-width: 220px; z-index: 200; line-height: 1.4; }
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 </style>
 </head>
 <body>
@@ -180,9 +193,10 @@ button {
   <h1>padhowithPratyush</h1>
   <span class="badge hl">HNSW</span>
   <span class="badge">KD-TREE</span>
-  <span class="badge">BRUTE FORCE</span>
-  <span class="badge hl" style="border-color:rgba(255,183,77,.5);color:var(--food);background:rgba(255,183,77,.08)">SQ8</span>
-  <span class="badge hl" style="border-color:rgba(166,227,161,.5);color:var(--green);background:rgba(166,227,161,.08)">BM25+RRF</span>
+  <span class="badge">BRUTE</span>
+  <span class="badge hl" style="border-color:rgba(255,183,77,.5);color:var(--food)">SQ8</span>
+  <span class="badge hl" style="border-color:rgba(166,227,161,.5);color:var(--green)">BM25+RRF</span>
+  <span class="badge p4">ADVANCED RAG</span>
   <span class="badge" id="ollamaBadge">OLLAMA…</span>
   <span id="statsLabel">loading…</span>
 </header>
@@ -193,7 +207,7 @@ button {
   <div class="left-panel">
     <div>
       <div class="sec">Query (Demo Vectors)</div>
-      <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;flex-direction:column;gap:5px">
         <input type="text" id="qInput" placeholder="binary tree, sushi, basketball…" />
         <button class="btn-p" onclick="runSearch()">⚡ SEARCH</button>
       </div>
@@ -220,29 +234,6 @@ button {
              oninput="document.getElementById('kLabel').textContent=this.value">
     </div>
     <div>
-      <div class="sec">Category Legend</div>
-      <div class="legend">
-        <div class="leg-row"><div class="dot" style="background:var(--cs);box-shadow:0 0 5px var(--cs)"></div>CS / Algorithms</div>
-        <div class="leg-row"><div class="dot" style="background:var(--math);box-shadow:0 0 5px var(--math)"></div>Mathematics</div>
-        <div class="leg-row"><div class="dot" style="background:var(--food);box-shadow:0 0 5px var(--food)"></div>Food &amp; Cooking</div>
-        <div class="leg-row"><div class="dot" style="background:var(--sports);box-shadow:0 0 5px var(--sports)"></div>Sports &amp; Games</div>
-        <div class="leg-row"><div class="dot" style="background:var(--green);box-shadow:0 0 5px var(--green)"></div>Documents (RAG)</div>
-      </div>
-    </div>
-    <div>
-      <div class="sec">Insert Demo Vector</div>
-      <div style="display:flex;flex-direction:column;gap:6px">
-        <input type="text" id="addMeta" placeholder="Description…" />
-        <select id="addCat">
-          <option value="cs">CS / Algorithms</option>
-          <option value="math">Mathematics</option>
-          <option value="food">Food &amp; Cooking</option>
-          <option value="sports">Sports &amp; Games</option>
-        </select>
-        <button class="btn-s" onclick="addVector()">+ INSERT</button>
-      </div>
-    </div>
-    <div>
       <div class="sec">Category Filter</div>
       <select id="catFilter">
         <option value="">All Categories</option>
@@ -254,13 +245,23 @@ button {
       </select>
     </div>
     <div>
+      <div class="sec">Category Legend</div>
+      <div class="legend">
+        <div class="leg-row"><div class="dot" style="background:var(--cs);box-shadow:0 0 5px var(--cs)"></div>CS / Algorithms</div>
+        <div class="leg-row"><div class="dot" style="background:var(--math);box-shadow:0 0 5px var(--math)"></div>Mathematics</div>
+        <div class="leg-row"><div class="dot" style="background:var(--food);box-shadow:0 0 5px var(--food)"></div>Food &amp; Cooking</div>
+        <div class="leg-row"><div class="dot" style="background:var(--sports);box-shadow:0 0 5px var(--sports)"></div>Sports &amp; Games</div>
+        <div class="leg-row"><div class="dot" style="background:var(--green);box-shadow:0 0 5px var(--green)"></div>Documents (RAG)</div>
+      </div>
+    </div>
+    <div>
       <div class="sec">Benchmark</div>
       <button class="btn-s" onclick="runBenchmark()">▶ COMPARE ALL ALGOS</button>
     </div>
     <div>
       <div class="sec">Persistence</div>
       <button class="btn-y" id="saveBtn" onclick="saveToDisk()">💾 SAVE TO DISK</button>
-      <div id="saveStatus" style="font-size:10px;color:var(--muted);margin-top:5px"></div>
+      <div id="saveStatus" style="font-size:9px;color:var(--muted);margin-top:4px"></div>
     </div>
   </div>
 
@@ -272,7 +273,7 @@ button {
     <div class="tabs">
       <div class="tab on"  onclick="switchTab('search')">SEARCH</div>
       <div class="tab"     onclick="switchTab('docs')">DOCUMENTS</div>
-      <div class="tab"     onclick="switchTab('rag')">ASK AI</div>
+      <div class="tab"     onclick="switchTab('rag')">ASK AI (RAG)</div>
       <div class="tab"     onclick="switchTab('system')">SYSTEM</div>
     </div>
 
@@ -286,12 +287,12 @@ button {
       <div>
         <div class="sec">Top Matches</div>
         <div class="results" id="results">
-          <div style="color:var(--muted);font-size:11px">Run a search to see results…</div>
+          <div style="color:var(--muted);font-size:10px">Run a search to see results…</div>
         </div>
       </div>
       <div>
         <div class="sec">Query Embedding (16D)</div>
-        <canvas id="vecCvs" height="76"></canvas>
+        <canvas id="vecCvs" height="70"></canvas>
       </div>
       <div id="benchSec" style="display:none">
         <div class="sec">Algorithm Comparison</div>
@@ -300,68 +301,92 @@ button {
       <div>
         <div class="sec">HNSW Graph Layers</div>
         <div class="layers" id="layers">
-          <div style="color:var(--muted);font-size:11px">Loading…</div>
+          <div style="color:var(--muted);font-size:10px">Loading…</div>
         </div>
       </div>
     </div>
 
-    <!-- TAB: DOCUMENTS -->
+    <!-- TAB: DOCUMENTS (Phase 4: Semantic Chunking) -->
     <div class="tab-content" id="tab-docs">
       <div>
         <div class="sec">Ollama Status</div>
         <div class="ollama-status" id="ollamaStatus">Checking…</div>
       </div>
       <div>
-        <div class="sec">Insert Document</div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <input type="text" id="docTitle" placeholder="Document title / topic…" />
-          <textarea id="docText" placeholder="Paste your notes, textbook excerpt, lecture content…&#10;&#10;Long text is automatically split into overlapping chunks and each chunk gets its own real embedding via Ollama's nomic-embed-text model."></textarea>
-          <button class="btn-g" id="insertDocBtn" onclick="insertDocument()">⚡ EMBED &amp; INSERT</button>
-          <div id="insertStatus" style="font-size:11px;color:var(--muted)"></div>
+        <div class="sec">Chunking Strategy (Phase 4)</div>
+        <div class="mode-row">
+          <div class="mode-btn on" id="chunkFixed"    onclick="setChunkMode('fixed')">📏 FIXED (250w)</div>
+          <div class="mode-btn"    id="chunkSemantic" onclick="setChunkMode('semantic')">🧠 SEMANTIC (Embed)</div>
         </div>
+      </div>
+      <div>
+        <div class="sec">Insert Document</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <input type="text" id="docTitle" placeholder="Document title / topic…" />
+          <textarea id="docText" placeholder="Paste notes, articles, or documentation here…"></textarea>
+          <div style="display:flex;gap:4px">
+            <button class="btn-s" id="previewChunkBtn" onclick="previewChunks()" style="flex:1">👁️ PREVIEW SPLITS</button>
+            <button class="btn-g" id="insertDocBtn" onclick="insertDocument()" style="flex:2">⚡ EMBED &amp; INSERT</button>
+          </div>
+          <div id="insertStatus" style="font-size:10px;color:var(--muted)"></div>
+        </div>
+      </div>
+      <!-- Semantic Chunk Preview Box -->
+      <div id="chunkPreviewBox" style="display:none">
+        <div class="sec">Semantic Distance Curve</div>
+        <div class="curve-box">
+          <div class="curve-bar-row" id="curveBars"></div>
+          <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--muted);margin-top:4px">
+            <span>Sentence 1</span>
+            <span style="color:var(--food)">■ Threshold Cut</span>
+            <span id="curveEndSent">Sentence N</span>
+          </div>
+        </div>
+        <div id="chunkPreviewList" style="margin-top:6px;font-size:9px;color:var(--muted);max-height:100px;overflow-y:auto"></div>
       </div>
       <div>
         <div class="sec">Stored Documents (<span id="docCountLabel">0</span>)</div>
         <div class="doc-list" id="docList">
-          <div style="color:var(--muted);font-size:11px">No documents yet. Insert some above.</div>
+          <div style="color:var(--muted);font-size:10px">No documents yet. Insert some above.</div>
         </div>
       </div>
     </div>
 
-    <!-- TAB: ASK AI (RAG) -->
+    <!-- TAB: ASK AI (Phase 4: Advanced RAG) -->
     <div class="tab-content" id="tab-rag">
       <div>
-        <div class="sec">Search Mode</div>
+        <div class="sec">Retrieval Pipeline (Phase 4)</div>
         <div class="mode-row">
-          <div class="mode-btn on" id="modeVector" onclick="setSearchMode('vector')">🔬 VECTOR ONLY</div>
-          <div class="mode-btn"    id="modeHybrid" onclick="setSearchMode('hybrid')">⚡ HYBRID BM25+HNSW</div>
+          <div class="mode-btn on" id="pipeVector" onclick="setPipeline('vector')">🔬 VECTOR</div>
+          <div class="mode-btn"    id="pipeHybrid" onclick="setPipeline('hybrid')">⚡ HYBRID</div>
+          <div class="mode-btn"    id="pipeRerank" onclick="setPipeline('rerank')">🎯 RERANK</div>
+          <div class="mode-btn"    id="pipeHyde"   onclick="setPipeline('hyde')">🔮 HYDE</div>
         </div>
-        <div id="hybridNote" style="display:none;font-size:9px;color:var(--muted);margin-top:5px;line-height:1.5">Combines keyword (BM25) + semantic (HNSW) via Reciprocal Rank Fusion. Best for exact terms + conceptual queries.</div>
+        <div id="pipelineNote" style="font-size:8px;color:var(--muted);margin-top:4px;line-height:1.4">Standard HNSW vector similarity search.</div>
       </div>
       <div>
         <div class="sec">Ask a Question</div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <textarea id="ragQuestion" rows="3" placeholder="What is dynamic programming?&#10;Explain the main idea of HNSW.&#10;How does the recipe differ from…"></textarea>
-          <div style="display:flex;gap:6px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <textarea id="ragQuestion" rows="3" placeholder="What is dynamic programming?&#10;How does HNSW build its multi-layer graph?&#10;What are the benefits of quantization?"></textarea>
+          <div style="display:flex;gap:5px">
             <select id="ragK" style="width:auto;flex-shrink:0">
               <option value="2">Top 2</option>
               <option value="3" selected>Top 3</option>
               <option value="5">Top 5</option>
             </select>
-            <button class="btn-g" id="askBtn" onclick="askAI()" style="flex:1">🤖 ASK AI</button>
+            <button class="btn-g" id="askBtn" onclick="askAI()" style="flex:1">🤖 ASK AI (RAG)</button>
           </div>
-          <div style="font-size:10px;color:var(--muted)">Uses your inserted documents as context. Answers come from the local LLM.</div>
         </div>
       </div>
       <div>
-        <div class="sec">Conversation</div>
+        <div class="sec">Conversation &amp; Grounding</div>
         <div class="chat-history" id="chatHistory">
-          <div style="color:var(--muted);font-size:11px">Ask a question about your inserted documents…</div>
+          <div style="color:var(--muted);font-size:10px">Ask a question about your inserted documents…</div>
         </div>
       </div>
     </div>
 
-    <!-- TAB: SYSTEM (Phase 3) -->
+    <!-- TAB: SYSTEM (Phase 4) -->
     <div class="tab-content" id="tab-system">
       <div>
         <div class="sec">Index Statistics</div>
@@ -373,23 +398,22 @@ button {
         </div>
       </div>
       <div>
-        <div class="sec">SQ8 Memory Savings (Demo Index)</div>
-        <div id="sq8Details" class="persist-card">Loading…</div>
-      </div>
-      <div>
-        <div class="sec">Disk Persistence</div>
-        <button class="btn-y" onclick="saveToDisk()" style="margin-bottom:8px">💾 SAVE INDEXES NOW</button>
-        <div id="persistStatus" class="persist-card">Loading…</div>
-      </div>
-      <div>
-        <div class="sec">Active Features (Phase 3)</div>
-        <div style="font-size:11px;line-height:2;color:var(--muted)">
-          <div>✅ <span style="color:var(--text)">Disk Persistence</span> — auto save/load on restart</div>
-          <div>✅ <span style="color:var(--text)">SQ8 Compression</span> — float32 → int8 (4× smaller)</div>
-          <div>✅ <span style="color:var(--text)">BM25 Index</span> — keyword search over documents</div>
-          <div>✅ <span style="color:var(--text)">Hybrid Search</span> — BM25 + HNSW via RRF fusion</div>
-          <div>✅ <span style="color:var(--text)">Category Filter</span> — single-stage HNSW filtering</div>
+        <div class="sec">Active Architecture (Phase 4)</div>
+        <div style="font-size:10px;line-height:1.9;color:var(--muted);background:var(--bg);padding:10px;border-radius:6px;border:1px solid var(--border)">
+          <div>✅ <span style="color:var(--text)">HNSW / KD-Tree / BruteForce</span> — 3 Search Algos</div>
+          <div>✅ <span style="color:var(--text)">Disk Persistence</span> — Auto JSON Snapshots</div>
+          <div>✅ <span style="color:var(--text)">SQ8 Quantization</span> — 4× Memory Compression</div>
+          <div>✅ <span style="color:var(--text)">BM25 Hybrid Search</span> — Reciprocal Rank Fusion</div>
+          <div>✅ <span style="color:var(--math)">Semantic Chunking</span> — Topic Boundary Detection</div>
+          <div>✅ <span style="color:var(--math)">Two-Stage Re-ranking</span> — Cross-Attention Scoring</div>
+          <div>✅ <span style="color:var(--math)">Sentence Grounding</span> — Factuality &amp; Citations</div>
+          <div>✅ <span style="color:var(--math)">HyDE Engine</span> — Hypothetical Embeddings</div>
         </div>
+      </div>
+      <div>
+        <div class="sec">Disk Snapshot Status</div>
+        <button class="btn-y" onclick="saveToDisk()" style="margin-bottom:6px">💾 SAVE INDEXES NOW</button>
+        <div id="persistStatus" class="persist-card">Loading…</div>
       </div>
     </div>
 
@@ -400,7 +424,7 @@ button {
 
 <script>
 // ════════════════════════════════════════════════════════════
-//  CONSTANTS
+//  CONSTANTS & STATE
 // ════════════════════════════════════════════════════════════
 const API  = 'http://localhost:8080';
 const DIMS = 16;
@@ -408,12 +432,10 @@ const COL  = { cs:'#00d9ff', math:'#b388ff', food:'#ffb74d', sports:'#69f0ae', d
 const DIM_COL = ['#00d9ff','#00d9ff','#00d9ff','#00d9ff','#b388ff','#b388ff','#b388ff','#b388ff',
                  '#ffb74d','#ffb74d','#ffb74d','#ffb74d','#69f0ae','#69f0ae','#69f0ae','#69f0ae'];
 
-// ════════════════════════════════════════════════════════════
-//  STATE
-// ════════════════════════════════════════════════════════════
 let allItems = [], pcaPoints = [], hitIds = new Set(), queryPt = null;
 let hoverItem = null, pulse = 0, selAlgo = 'hnsw', searchResults = [];
-let searchMode = 'vector'; // 'vector' or 'hybrid'
+let chunkStrategy = 'fixed';    // 'fixed' or 'semantic'
+let ragPipeline = 'vector';     // 'vector', 'hybrid', 'rerank', 'hyde'
 
 // ════════════════════════════════════════════════════════════
 //  TABS
@@ -430,17 +452,31 @@ function switchTab(name) {
 }
 
 // ════════════════════════════════════════════════════════════
-//  PHASE 3: SEARCH MODE (hybrid / vector)
+//  PHASE 4: PIPELINE & CHUNKING TOGGLES
 // ════════════════════════════════════════════════════════════
-function setSearchMode(mode) {
-  searchMode = mode;
-  document.getElementById('modeVector').classList.toggle('on', mode === 'vector');
-  document.getElementById('modeHybrid').classList.toggle('on', mode === 'hybrid');
-  document.getElementById('hybridNote').style.display = mode === 'hybrid' ? 'block' : 'none';
+function setChunkMode(mode) {
+  chunkStrategy = mode;
+  document.getElementById('chunkFixed').classList.toggle('on', mode === 'fixed');
+  document.getElementById('chunkSemantic').classList.toggle('on', mode === 'semantic');
+}
+
+function setPipeline(pipe) {
+  ragPipeline = pipe;
+  ['vector','hybrid','rerank','hyde'].forEach(p => {
+    const el = document.getElementById('pipe' + p.charAt(0).toUpperCase() + p.slice(1));
+    if (el) el.classList.toggle('on', p === pipe);
+  });
+  const notes = {
+    vector: 'Standard HNSW vector similarity search.',
+    hybrid: 'Merges BM25 keyword matching + HNSW vector scores via Reciprocal Rank Fusion.',
+    rerank: '2-Stage: Oversamples top candidates from HNSW, then re-scores with Cross-Attention.',
+    hyde:   'Generates a hypothetical technical answer with LLM, then embeds it for HNSW search.'
+  };
+  document.getElementById('pipelineNote').textContent = notes[pipe] || '';
 }
 
 // ════════════════════════════════════════════════════════════
-//  TEXT → 16-D EMBEDDING (for demo vectors)
+//  TEXT → 16-D EMBEDDING (for demo visualizer)
 // ════════════════════════════════════════════════════════════
 const KW = {
   cs:     ['algorithm','data','tree','graph','array','linked','hash','stack','queue','sort','binary','dynamic','programming','recursion','complexity','pointer','node','search','insert','bfs','dfs','heap','trie'],
@@ -470,7 +506,7 @@ function textToEmbedding(text) {
 }
 
 // ════════════════════════════════════════════════════════════
-//  PCA
+//  PCA & SCATTER PLOT
 // ════════════════════════════════════════════════════════════
 function pca2D(embs) {
   const n = embs.length, d = embs[0].length;
@@ -499,9 +535,6 @@ function pca2D(embs) {
   return X.map(x=>[x.reduce((s,v,i)=>s+v*pc1[i],0),x.reduce((s,v,i)=>s+v*pc2[i],0)]);
 }
 
-// ════════════════════════════════════════════════════════════
-//  SCATTER PLOT
-// ════════════════════════════════════════════════════════════
 const sc=document.getElementById('scatter'), ctx=sc.getContext('2d');
 let bounds={minX:-1,maxX:1,minY:-1,maxY:1};
 
@@ -509,7 +542,7 @@ function resize() { const r=sc.parentElement.getBoundingClientRect(); sc.width=r
 window.addEventListener('resize', resize);
 
 function w2c(wx,wy) {
-  const P=70,W=sc.width,H=sc.height,rx=bounds.maxX-bounds.minX||1,ry=bounds.maxY-bounds.minY||1;
+  const P=60,W=sc.width,H=sc.height,rx=bounds.maxX-bounds.minX||1,ry=bounds.maxY-bounds.minY||1;
   return [P+((wx-bounds.minX)/rx)*(W-2*P), H-P-((wy-bounds.minY)/ry)*(H-2*P)];
 }
 
@@ -518,15 +551,15 @@ function drawFrame() {
   ctx.fillStyle='#07070f'; ctx.fillRect(0,0,sc.width,sc.height);
   ctx.strokeStyle='#0e0e1e'; ctx.lineWidth=1;
   for (let i=0;i<=8;i++) {
-    const tx=70+(i/8)*(sc.width-140),ty=70+(i/8)*(sc.height-140);
-    ctx.beginPath();ctx.moveTo(tx,70);ctx.lineTo(tx,sc.height-70);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(70,ty);ctx.lineTo(sc.width-70,ty);ctx.stroke();
+    const tx=60+(i/8)*(sc.width-120),ty=60+(i/8)*(sc.height-120);
+    ctx.beginPath();ctx.moveTo(tx,60);ctx.lineTo(tx,sc.height-60);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(60,ty);ctx.lineTo(sc.width-60,ty);ctx.stroke();
   }
-  ctx.fillStyle='#1a1a38'; ctx.font='11px Fira Code,monospace';
-  ctx.fillText('PC₁ →',sc.width/2-40,sc.height-18);
-  ctx.save();ctx.translate(18,sc.height/2+50);ctx.rotate(-Math.PI/2);ctx.fillText('PC₂ →',0,0);ctx.restore();
-  ctx.fillStyle='#151530'; ctx.font='12px Fira Code,monospace';
-  ctx.fillText('2D PCA Projection  ·  Semantic Space',80,28);
+  ctx.fillStyle='#1a1a38'; ctx.font='10px Fira Code,monospace';
+  ctx.fillText('PC₁ →',sc.width/2-30,sc.height-14);
+  ctx.save();ctx.translate(16,sc.height/2+40);ctx.rotate(-Math.PI/2);ctx.fillText('PC₂ →',0,0);ctx.restore();
+  ctx.fillStyle='#151530'; ctx.font='11px Fira Code,monospace';
+  ctx.fillText('2D PCA Projection  ·  Semantic Space',70,24);
 
   if (queryPt && hitIds.size>0) {
     const [qx,qy]=w2c(queryPt.x,queryPt.y);
@@ -541,9 +574,9 @@ function drawFrame() {
   for (const pt of pcaPoints) {
     const [cx,cy]=w2c(pt.x,pt.y);
     const col=COL[pt.item.category]||COL.default;
-    const isHit=hitIds.has(pt.item.id), r=isHit?10:7;
+    const isHit=hitIds.has(pt.item.id), r=isHit?9:6;
     if (isHit) {
-      const pr=r+7+Math.sin(pulse)*3.5;
+      const pr=r+6+Math.sin(pulse)*3;
       ctx.beginPath();ctx.arc(cx,cy,pr,0,2*Math.PI);
       ctx.strokeStyle=col+'55';ctx.lineWidth=1.5;ctx.stroke();
     }
@@ -552,22 +585,18 @@ function drawFrame() {
     ctx.beginPath();ctx.arc(cx,cy,r*3,0,2*Math.PI);ctx.fillStyle=grd;ctx.fill();
     ctx.beginPath();ctx.arc(cx,cy,r,0,2*Math.PI);ctx.fillStyle=col;ctx.fill();
     if (hoverItem&&hoverItem.id===pt.item.id) {
-      ctx.beginPath();ctx.arc(cx,cy,r+5,0,2*Math.PI);ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.stroke();
+      ctx.beginPath();ctx.arc(cx,cy,r+4,0,2*Math.PI);ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.stroke();
     }
   }
   if (queryPt) {
     const [qx,qy]=w2c(queryPt.x,queryPt.y);
     ctx.save();ctx.translate(qx,qy);
-    ctx.shadowColor='#fff';ctx.shadowBlur=18;
+    ctx.shadowColor='#fff';ctx.shadowBlur=14;
     ctx.beginPath();
-    for (let i=0;i<10;i++){const a=(i*Math.PI/5)-Math.PI/2,rr=i%2===0?13:5;if(i===0)ctx.moveTo(Math.cos(a)*rr,Math.sin(a)*rr);else ctx.lineTo(Math.cos(a)*rr,Math.sin(a)*rr);}
+    for (let i=0;i<10;i++){const a=(i*Math.PI/5)-Math.PI/2,rr=i%2===0?11:4;if(i===0)ctx.moveTo(Math.cos(a)*rr,Math.sin(a)*rr);else ctx.lineTo(Math.cos(a)*rr,Math.sin(a)*rr);}
     ctx.closePath();ctx.fillStyle='#fff';ctx.fill();
     ctx.shadowBlur=0;ctx.restore();
-    ctx.fillStyle='#aaaacc';ctx.font='10px Fira Code,monospace';ctx.fillText('query',qx+16,qy+4);
-  }
-  if (!pcaPoints.length) {
-    ctx.fillStyle='#1a1a38';ctx.font='13px Fira Code,monospace';ctx.textAlign='center';
-    ctx.fillText('Connecting to VectorDB…',sc.width/2,sc.height/2);ctx.textAlign='left';
+    ctx.fillStyle='#aaaacc';ctx.font='9px Fira Code,monospace';ctx.fillText('query',qx+14,qy+3);
   }
   pulse+=0.05;
   requestAnimationFrame(drawFrame);
@@ -575,7 +604,7 @@ function drawFrame() {
 
 sc.addEventListener('mousemove', e => {
   const rect=sc.getBoundingClientRect(),mx=e.clientX-rect.left,my=e.clientY-rect.top;
-  hoverItem=null; let best=18;
+  hoverItem=null; let best=16;
   for (const pt of pcaPoints) {
     const [cx,cy]=w2c(pt.x,pt.y),d=Math.hypot(mx-cx,my-cy);
     if (d<best){best=d;hoverItem=pt.item;}
@@ -583,15 +612,20 @@ sc.addEventListener('mousemove', e => {
   const tip=document.getElementById('tip');
   if (hoverItem) {
     const col=COL[hoverItem.category]||COL.default;
-    tip.style.display='block';tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY-8)+'px';
+    tip.style.display='block';tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY-8)+'px';
     tip.innerHTML=`<span style="color:${col}">[${hoverItem.category}]</span><br>${hoverItem.metadata}`;
   } else tip.style.display='none';
 });
 sc.addEventListener('mouseleave',()=>{hoverItem=null;document.getElementById('tip').style.display='none';});
 
 // ════════════════════════════════════════════════════════════
-//  LOAD DEMO ITEMS
+//  DEMO SEARCH & BENCHMARK
 // ════════════════════════════════════════════════════════════
+function setAlgo(el) {
+  document.querySelectorAll('.algo-btn').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on'); selAlgo=el.dataset.algo;
+}
+
 async function loadItems() {
   try {
     const r = await fetch(API+'/items');
@@ -608,19 +642,11 @@ async function loadItems() {
   } catch(_) {}
 }
 
-// ════════════════════════════════════════════════════════════
-//  DEMO SEARCH
-// ════════════════════════════════════════════════════════════
-function setAlgo(el) {
-  document.querySelectorAll('.algo-btn').forEach(b=>b.classList.remove('on'));
-  el.classList.add('on'); selAlgo=el.dataset.algo;
-}
-
 async function runSearch() {
   const text=document.getElementById('qInput').value.trim(); if(!text)return;
   const emb=textToEmbedding(text),k=parseInt(document.getElementById('kSlider').value);
   const metric=document.getElementById('metric').value;
-  const cat=document.getElementById('catFilter').value;  // Phase 3: category filter
+  const cat=document.getElementById('catFilter').value;
   let url=`${API}/search?v=${emb.join(',')}&k=${k}&metric=${metric}&algo=${selAlgo}`;
   if (cat) url += `&category=${encodeURIComponent(cat)}`;
   try {
@@ -628,8 +654,8 @@ async function runSearch() {
     searchResults=data.results||[]; hitIds=new Set(searchResults.map(r=>r.id));
     const us=data.latencyUs||0;
     document.getElementById('latBig').textContent=us<1000?us+' μs':(us/1000).toFixed(2)+' ms';
-    const filterStr = data.categoryFilter ? `  ·  filter:${data.categoryFilter}` : '';
-    document.getElementById('latSub').textContent=selAlgo.toUpperCase()+'  ·  '+metric+'  ·  k='+k+filterStr;
+    const filterStr = data.categoryFilter ? ` · filter:${data.categoryFilter}` : '';
+    document.getElementById('latSub').textContent=selAlgo.toUpperCase()+' · '+metric+' · k='+k+filterStr;
     if (searchResults.length>0){
       let sx=0,sy=0,sw=0;
       for (let i=0;i<Math.min(3,searchResults.length);i++){
@@ -645,7 +671,7 @@ async function runSearch() {
 document.getElementById('qInput').addEventListener('keydown',e=>{if(e.key==='Enter')runSearch();});
 
 function renderResults(results) {
-  if (!results||!results.length){document.getElementById('results').innerHTML='<div style="color:var(--muted);font-size:11px">No results</div>';return;}
+  if (!results||!results.length){document.getElementById('results').innerHTML='<div style="color:var(--muted);font-size:10px">No results</div>';return;}
   document.getElementById('results').innerHTML=results.map((r,i)=>{
     const col=COL[r.category]||COL.default;
     return `<div class="rcard" onmouseenter="hoverItem={id:${r.id}}" onmouseleave="hoverItem=null">
@@ -663,15 +689,15 @@ function renderResults(results) {
 function drawVecChart(emb) {
   const vc=document.getElementById('vecCvs'),W=vc.parentElement.clientWidth;
   vc.width=W;const vx=vc.getContext('2d');
-  vx.clearRect(0,0,W,76);vx.fillStyle='#07070f';vx.fillRect(0,0,W,76);
+  vx.clearRect(0,0,W,70);vx.fillStyle='#07070f';vx.fillRect(0,0,W,70);
   const bw=(W-4)/DIMS;
   for (let i=0;i<DIMS;i++){
-    const h=emb[i]*58,x=2+i*bw,col=DIM_COL[i];
-    vx.shadowColor=col;vx.shadowBlur=5;vx.fillStyle=col+'aa';vx.fillRect(x+1,63-h,bw-2,h);
+    const h=emb[i]*52,x=2+i*bw,col=DIM_COL[i];
+    vx.shadowColor=col;vx.shadowBlur=4;vx.fillStyle=col+'aa';vx.fillRect(x+1,58-h,bw-2,h);
   }
-  vx.shadowBlur=0;vx.font='8px monospace';vx.textAlign='center';
+  vx.shadowBlur=0;vx.font='7px monospace';vx.textAlign='center';
   [['CS',0],['MATH',4],['FOOD',8],['SPORT',12]].forEach(([lbl,gi],i)=>{
-    vx.fillStyle=Object.values(COL)[i]+'77';vx.fillText(lbl,2+(gi+1.5)*bw,74);
+    vx.fillStyle=Object.values(COL)[i]+'77';vx.fillText(lbl,2+(gi+1.5)*bw,68);
   });
   vx.textAlign='left';
 }
@@ -702,18 +728,7 @@ async function loadHNSW() {
     document.getElementById('layers').innerHTML=d.nodesPerLayer.map((cnt,lyr)=>{
       const pct=Math.max((cnt/maxN)*100,2),edg=d.edgesPerLayer[lyr]||0;
       return `<div class="lrow"><div class="lnum">L${lyr}</div><div class="ltrack"><div class="lfill" style="width:${pct}%"></div></div><div class="lcount">${cnt}n · ${edg}e</div></div>`;
-    }).join('')||'<div style="color:var(--muted);font-size:11px">Empty</div>';
-  } catch(_) {}
-}
-
-async function addVector() {
-  const meta=document.getElementById('addMeta').value.trim(),cat=document.getElementById('addCat').value;
-  if(!meta)return;
-  const emb=textToEmbedding(meta+' '+cat);
-  try {
-    await fetch(API+'/insert',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({metadata:meta,category:cat,embedding:emb})});
-    document.getElementById('addMeta').value='';
-    await loadItems();loadHNSW();
+    }).join('')||'<div style="color:var(--muted);font-size:10px">Empty</div>';
   } catch(_) {}
 }
 
@@ -726,62 +741,77 @@ async function deleteItem(id) {
 }
 
 // ════════════════════════════════════════════════════════════
-//  DOCUMENT MANAGEMENT
+//  PHASE 4: SEMANTIC CHUNKING & PREVIEW
 // ════════════════════════════════════════════════════════════
-async function checkOllamaStatus() {
+async function previewChunks() {
+  const text = document.getElementById('docText').value.trim();
+  const btn = document.getElementById('previewChunkBtn');
+  const box = document.getElementById('chunkPreviewBox');
+  if (!text) { alert('Paste text first to preview semantic splits.'); return; }
+
+  btn.disabled = true; btn.textContent = 'Analyzing…';
   try {
-    const r=await fetch(API+'/status'), d=await r.json();
-    const badge=document.getElementById('ollamaBadge');
-    const box=document.getElementById('ollamaStatus');
-    if (d.ollamaAvailable) {
-      badge.className='badge ok'; badge.textContent='OLLAMA ✓';
-      box.className='ollama-status ok';
-      box.innerHTML=`<span style="color:var(--green)">● Online</span><br>`+
-        `Embed: <span style="color:var(--accent)">${d.embedModel}</span><br>`+
-        `Generate: <span style="color:var(--accent)">${d.genModel}</span><br>`+
-        `Dims: <span style="color:var(--muted)">${d.docDims||'(first insert sets this)'}</span><br>`+
-        `Documents: <span style="color:var(--text)">${d.docCount}</span>`;
-    } else {
-      badge.className='badge err'; badge.textContent='OLLAMA ✗';
-      box.className='ollama-status err';
-      box.innerHTML=`<span style="color:var(--red)">● Offline</span><br><br>`+
-        `To enable RAG features:<br>`+
-        `<span style="color:var(--muted)">1. Install from ollama.com<br>`+
-        `2. ollama pull nomic-embed-text<br>`+
-        `3. ollama pull llama3.2</span>`;
-    }
-  } catch(_) {}
+    const r = await fetch(API + '/doc/semantic-chunk-preview', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text, threshold_percentile: 75.0})
+    });
+    const d = await r.json();
+    box.style.display = 'block';
+
+    const dists = d.distances || [];
+    const maxD = Math.max(...dists, 0.01);
+    const splitSet = new Set(d.splitIndices || []);
+
+    document.getElementById('curveBars').innerHTML = dists.map((dist, i) => {
+      const isSplit = splitSet.has(i);
+      const hPct = Math.max(8, (dist / maxD) * 100);
+      const cls = isSplit ? 'curve-bar split' : 'curve-bar';
+      return `<div class="${cls}" style="height:${hPct}%" title="S${i+1}→S${i+2}: dist ${dist}"></div>`;
+    }).join('') || '<div style="color:var(--muted);font-size:9px">Single sentence.</div>';
+
+    document.getElementById('curveEndSent').textContent = `Sentence ${d.sentenceCount}`;
+
+    document.getElementById('chunkPreviewList').innerHTML = (d.chunks || []).map((c, i) =>
+      `<div style="margin-bottom:4px;padding:4px;background:#090915;border-radius:4px">` +
+      `<b style="color:var(--food)">Chunk #${i+1}</b> (${c.words} words, Sentences ${c.sentenceRange[0]+1}–${c.sentenceRange[1]+1}):<br>` +
+      `<span style="color:var(--text)">${c.text.slice(0, 100)}…</span></div>`
+    ).join('');
+
+  } catch(e) {
+    alert('Preview failed — is Ollama running?');
+  }
+  btn.disabled = false; btn.textContent = '👁️ PREVIEW SPLITS';
 }
 
 async function insertDocument() {
-  const title=document.getElementById('docTitle').value.trim();
-  const text=document.getElementById('docText').value.trim();
-  const btn=document.getElementById('insertDocBtn');
-  const status=document.getElementById('insertStatus');
+  const title = document.getElementById('docTitle').value.trim();
+  const text = document.getElementById('docText').value.trim();
+  const btn = document.getElementById('insertDocBtn');
+  const status = document.getElementById('insertStatus');
   if(!title||!text){status.textContent='⚠ Need both a title and text.';return;}
 
   btn.disabled=true; btn.textContent='Embedding…';
-  status.innerHTML='<span style="color:var(--muted)">Calling Ollama nomic-embed-text…</span>';
+  status.innerHTML=`<span style="color:var(--muted)">Embedding via ${chunkStrategy.toUpperCase()} chunking…</span>`;
 
   try {
     const r=await fetch(API+'/doc/insert',{
       method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({title,text})
+      body:JSON.stringify({title, text, chunking_strategy: chunkStrategy})
     });
     const d=await r.json();
     if (d.error) {
       status.innerHTML=`<span style="color:var(--red)">✗ ${d.error}</span>`;
     } else {
-      status.innerHTML=`<span style="color:var(--green)">✓ Inserted ${d.chunks} chunk(s) · ${d.dims}D embeddings</span>`;
+      status.innerHTML=`<span style="color:var(--green)">✓ Inserted ${d.chunks} chunk(s) (${d.strategy}) · ${d.dims}D</span>`;
       document.getElementById('docTitle').value='';
       document.getElementById('docText').value='';
+      document.getElementById('chunkPreviewBox').style.display='none';
 
-          // Insert a 16D fake vector into the visualizer DB so it shows up on the map
-          const emb16 = textToEmbedding(title + ' ' + text);
-          fetch(API+'/insert', {
-            method:'POST', headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({metadata: title, category: 'doc', embedding: emb16})
-          }).then(() => { loadItems().then(loadHNSW); });
+      const emb16 = textToEmbedding(title + ' ' + text);
+      fetch(API+'/insert', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({metadata: title, category: 'doc', embedding: emb16})
+      }).then(() => { loadItems().then(loadHNSW); });
 
       loadDocList(); checkOllamaStatus();
     }
@@ -796,11 +826,11 @@ async function loadDocList() {
     const r=await fetch(API+'/doc/list'), docs=await r.json();
     document.getElementById('docCountLabel').textContent=docs.length;
     if (!docs.length) {
-      document.getElementById('docList').innerHTML='<div style="color:var(--muted);font-size:11px">No documents yet.</div>';
+      document.getElementById('docList').innerHTML='<div style="color:var(--muted);font-size:10px">No documents yet.</div>';
       return;
     }
     document.getElementById('docList').innerHTML=docs.map(d=>`
-      <div class="dcard">
+      <div class="dcard" id="dcard-${d.id}">
         <div class="dcard-title">${d.title}</div>
         <div class="dcard-preview">${d.preview}</div>
         <div class="dcard-foot">
@@ -819,14 +849,144 @@ async function deleteDoc(id) {
 }
 
 // ════════════════════════════════════════════════════════════
-//  RAG  — Ask AI
+//  PHASE 4: ADVANCED RAG & GROUNDING
 // ════════════════════════════════════════════════════════════
 document.getElementById('ragQuestion').addEventListener('keydown',e=>{
   if(e.key==='Enter'&&e.ctrlKey)askAI();
 });
 
+async function askAI() {
+  const question=document.getElementById('ragQuestion').value.trim();
+  if(!question)return;
+  const k=parseInt(document.getElementById('ragK').value);
+  const btn=document.getElementById('askBtn');
+  btn.disabled=true; btn.textContent='Thinking…';
+
+  const history=document.getElementById('chatHistory');
+  history.innerHTML='';
+
+  const qDiv=document.createElement('div'); qDiv.className='chat-q';
+  qDiv.innerHTML=`<b>Q:</b> ${question} <span style="float:right;color:var(--muted);font-size:9px">[${ragPipeline.toUpperCase()}]</span>`;
+  history.appendChild(qDiv);
+
+  const thinkDiv=document.createElement('div'); thinkDiv.className='thinking';
+  thinkDiv.innerHTML='<div class="spinner"></div>Running multi-stage retrieval, generation & grounding…';
+  history.appendChild(thinkDiv);
+  history.scrollTop=history.scrollHeight;
+
+  try {
+    const r = await fetch(API + '/doc/advanced-ask', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question, k, pipeline: ragPipeline, grounding: true})
+    });
+    const d = await r.json();
+    thinkDiv.remove();
+
+    const aDiv = document.createElement('div'); aDiv.className = 'chat-a';
+
+    if (d.error) {
+      aDiv.innerHTML = `<div class="chat-a-label">ERROR</div><div class="chat-a-text" style="color:var(--red)">${d.error}</div>`;
+      history.appendChild(aDiv);
+    } else {
+      const lat = d.latencies || {};
+      const latBadge = `<span style="float:right;font-size:8px;color:var(--muted)">ret:${lat.retrievalMs||0}ms | gen:${lat.generationMs||0}ms | gnd:${lat.groundingMs||0}ms</span>`;
+
+      // 1. Build Grounded Text with interactive sentence tooltips
+      let answerHtml = '';
+      if (d.grounding && d.grounding.sentences && d.grounding.sentences.length > 0) {
+        answerHtml = d.grounding.sentences.map((s, idx) => {
+          const cls = s.status === 'grounded' ? 'sent-grounded' : (s.status === 'partial' ? 'sent-partial' : 'sent-ungrounded');
+          const citHtml = s.citationId ? `<span class="cit-tag" onclick="highlightDoc(${s.sourceDocId})">[#${s.citationId}]</span>` : '';
+          return `<span class="${cls}" onclick="highlightDoc(${s.sourceDocId})" title="Confidence: ${Math.round(s.confidence*100)}% (${s.status})">${s.sentence}</span>${citHtml} `;
+        }).join('');
+      } else {
+        answerHtml = d.answer;
+      }
+
+      // 2. Build Grounding Meter
+      let groundingBoxHtml = '';
+      if (d.grounding) {
+        const rate = d.grounding.groundingRate || 0;
+        const col = rate >= 70 ? 'var(--green)' : (rate >= 40 ? 'var(--food)' : 'var(--red)');
+        groundingBoxHtml = `
+          <div class="grounding-box">
+            <div style="display:flex;justify-content:space-between;font-size:9px">
+              <span style="color:${col};font-weight:600">🛡️ ${rate}% Factually Grounded</span>
+              <span style="color:var(--muted)">Avg Conf: ${Math.round((d.grounding.overallConfidence||0)*100)}%</span>
+            </div>
+            <div class="grounding-meter"><div class="grounding-fill" style="width:${rate}%;background:${col}"></div></div>
+            <div style="font-size:8px;color:var(--muted)">Click any underlined sentence or citation tag to highlight its exact source chunk below.</div>
+          </div>`;
+      }
+
+      // 3. Build HyDE drawer if present
+      let hydeBoxHtml = '';
+      if (d.hydeDoc) {
+        hydeBoxHtml = `
+          <div style="margin-top:6px;padding:6px;background:#08081a;border:1px solid rgba(179,136,255,.25);border-radius:4px;font-size:9px">
+            <b style="color:var(--math)">🔮 HyDE Hypothetical Passage:</b><br>
+            <span style="color:var(--muted)">${d.hydeDoc}</span>
+          </div>`;
+      }
+
+      // 4. Build Rerank progression drawer if present
+      let rerankBoxHtml = '';
+      if (d.rerankItems && d.rerankItems.length > 0) {
+        rerankBoxHtml = `
+          <div style="margin-top:6px;padding:6px;background:#08081a;border:1px solid rgba(255,183,77,.25);border-radius:4px;font-size:9px">
+            <b style="color:var(--food)">🎯 Cross-Encoder Rerank Progression:</b><br>
+            ${d.rerankItems.map(item =>
+              `<div style="display:flex;justify-content:space-between;color:var(--muted)">`+
+              `<span>#${item.newRank} (was #${item.originalRank}) ${item.title}</span>`+
+              `<span style="color:var(--food)">score: ${item.score}</span></div>`
+            ).join('')}
+          </div>`;
+      }
+
+      // 5. Context chunks list
+      const ctxHtml = (d.contexts || []).map((c, i) =>
+        `<div class="rcard" id="ctx-card-${c.id}" style="margin-top:4px">`+
+        `<div class="rrank">#${i+1} SOURCE CHUNK (Score: ${c.score})</div>`+
+        `<div class="rmeta" style="color:var(--green)">${c.title}</div>`+
+        `<div style="font-size:9px;color:var(--muted);line-height:1.4">${c.text}</div></div>`
+      ).join('');
+
+      aDiv.innerHTML = `
+        <div class="chat-a-label">🤖 ${d.model||'llm'} ${latBadge}</div>
+        <div class="chat-a-text">${answerHtml}</div>
+        ${groundingBoxHtml}
+        ${hydeBoxHtml}
+        ${rerankBoxHtml}
+        <div class="chat-ctx">
+          <div class="chat-ctx-label">RETRIEVED CONTEXT (${d.contexts.length} chunks)</div>
+          ${ctxHtml}
+        </div>`;
+      history.appendChild(aDiv);
+    }
+  } catch(e) {
+    thinkDiv.remove();
+    const err=document.createElement('div');err.className='chat-a';
+    err.innerHTML='<div class="chat-a-label">ERROR</div><div class="chat-a-text" style="color:var(--red)">Server error — is the backend running?</div>';
+    history.appendChild(err);
+  }
+
+  document.getElementById('ragQuestion').value='';
+  btn.disabled=false; btn.textContent='🤖 ASK AI (RAG)';
+  history.scrollTop=history.scrollHeight;
+}
+
+function highlightDoc(docId) {
+  if (!docId) return;
+  document.querySelectorAll('.rcard').forEach(el => el.classList.remove('source-highlight'));
+  const target = document.getElementById('ctx-card-' + docId);
+  if (target) {
+    target.classList.add('source-highlight');
+    target.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+  }
+}
+
 // ════════════════════════════════════════════════════════════
-//  PHASE 3: SAVE TO DISK
+//  PERSISTENCE & SYSTEM STATS
 // ════════════════════════════════════════════════════════════
 async function saveToDisk() {
   const btn = document.getElementById('saveBtn');
@@ -846,43 +1006,40 @@ async function saveToDisk() {
   if (btn) btn.disabled=false;
 }
 
-// ════════════════════════════════════════════════════════════
-//  PHASE 3: SYSTEM STATS
-// ════════════════════════════════════════════════════════════
 async function loadSystemStats() {
   try {
-    const [sR, pR] = await Promise.all([
-      fetch(API+'/stats'),
-      fetch(API+'/persist/status')
-    ]);
-    const s = await sR.json();
-    const p = await pR.json();
+    const [sR, pR] = await Promise.all([fetch(API+'/stats'), fetch(API+'/persist/status')]);
+    const s = await sR.json(), p = await pR.json();
 
-    // Counts
     document.getElementById('sysVecCount').textContent = s.count || 0;
     document.getElementById('sysDocCount').textContent = (s.docIndex?.chunkCount) || 0;
     document.getElementById('sysCmpRatio').textContent = (s.sq8?.compressionRatio || 4).toFixed(1) + '×';
     document.getElementById('sysBm25Tokens').textContent = s.docIndex?.bm25TokenCount || 0;
 
-    // SQ8 detail
-    const sq8 = s.sq8 || {};
-    document.getElementById('sq8Details').innerHTML =
-      `<span style="color:var(--food)">● float32 → int8</span><br>` +
-      `Ratio: <span style="color:var(--text)">${(sq8.compressionRatio||4).toFixed(2)}×</span><br>` +
-      `float32 usage: <span style="color:var(--muted)">${fmtBytes(sq8.float32Bytes||0)}</span><br>` +
-      `int8 usage:   <span style="color:var(--muted)">${fmtBytes(sq8.int8Bytes||0)}</span><br>` +
-      `Saved:         <span style="color:var(--green)">${fmtBytes(sq8.savedBytes||0)}</span>`;
-
-    // Persistence
     const vs = p.vectorSnapshot, ds = p.documentSnapshot;
     document.getElementById('persistStatus').innerHTML =
-      `<b style="color:var(--text)">Vector Index</b><br>` +
-      `Path: <span style="color:var(--muted)">${vs.path}</span><br>` +
-      `Status: ${vs.exists ? `<span style="color:var(--green)">● Saved (${fmtBytes(vs.sizeBytes)})</span>` : '<span style="color:var(--muted)">Not saved yet</span>'}<br><br>` +
-      `<b style="color:var(--text)">Document Index</b><br>` +
-      `Path: <span style="color:var(--muted)">${ds.path}</span><br>` +
-      `Status: ${ds.exists ? `<span style="color:var(--green)">● Saved (${fmtBytes(ds.sizeBytes)})</span>` : '<span style="color:var(--muted)">Not saved yet</span>'}`;
+      `<b style="color:var(--text)">Vector Snapshot:</b> ${vs.exists ? `<span style="color:var(--green)">● Saved (${fmtBytes(vs.sizeBytes)})</span>` : '<span style="color:var(--muted)">Not saved</span>'}<br>` +
+      `<b style="color:var(--text)">Document Snapshot:</b> ${ds.exists ? `<span style="color:var(--green)">● Saved (${fmtBytes(ds.sizeBytes)})</span>` : '<span style="color:var(--muted)">Not saved</span>'}`;
     document.getElementById('persistStatus').className = 'persist-card ' + (vs.exists || ds.exists ? 'ok' : 'no');
+  } catch(_) {}
+}
+
+async function checkOllamaStatus() {
+  try {
+    const r=await fetch(API+'/status'), d=await r.json();
+    const badge=document.getElementById('ollamaBadge'), box=document.getElementById('ollamaStatus');
+    if (d.ollamaAvailable) {
+      badge.className='badge ok'; badge.textContent='OLLAMA ✓';
+      box.className='ollama-status ok';
+      box.innerHTML=`<span style="color:var(--green)">● Online</span><br>`+
+        `Embed: <span style="color:var(--accent)">${d.embedModel}</span><br>`+
+        `Generate: <span style="color:var(--accent)">${d.genModel}</span><br>`+
+        `Documents: <span style="color:var(--text)">${d.docCount}</span>`;
+    } else {
+      badge.className='badge err'; badge.textContent='OLLAMA ✗';
+      box.className='ollama-status err';
+      box.innerHTML=`<span style="color:var(--red)">● Offline</span><br>Run: <span style="color:var(--muted)">ollama serve</span>`;
+    }
   } catch(_) {}
 }
 
@@ -892,137 +1049,13 @@ function fmtBytes(b) {
   return (b/1048576).toFixed(2) + ' MB';
 }
 
-async function askAI() {
-  const question=document.getElementById('ragQuestion').value.trim();
-  if(!question)return;
-  const k=parseInt(document.getElementById('ragK').value);
-  const btn=document.getElementById('askBtn');
-  btn.disabled=true; btn.textContent='Thinking…';
-
-  const history=document.getElementById('chatHistory');
-  // Clear previous conversation
-  history.innerHTML='';
-
-  // Show question bubble
-  const qDiv=document.createElement('div'); qDiv.className='chat-q';
-  qDiv.textContent=question; history.appendChild(qDiv);
-
-  // Show thinking indicator
-  const thinkDiv=document.createElement('div'); thinkDiv.className='thinking';
-  thinkDiv.innerHTML='<div class="spinner"></div>Retrieving context & generating answer…';
-  history.appendChild(thinkDiv);
-  history.scrollTop=history.scrollHeight;
-
-  // Update the scatter plot visualizer in the background using the real 768D DB
-  fetch(API+'/doc/search', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({question, k})
-  })
-  .then(res=>res.json())
-  .then(data => {
-    if (data.contexts && data.contexts.length > 0) {
-      hitIds = new Set();
-      let sx=0, sy=0, sw=0;
-      data.contexts.forEach((ctx, i) => {
-        // Match the RAG chunk title back to the visualizer document metadata
-        const pt = pcaPoints.find(p => p.item.category === 'doc' && ctx.title.startsWith(p.item.metadata));
-        if (pt) {
-          hitIds.add(pt.item.id);
-          const w = 1/(i+1); sx += pt.x*w; sy += pt.y*w; sw += w;
-        }
-      });
-      if (sw > 0) queryPt = {x: sx/sw + (Math.random()-.5)*.015, y: sy/sw + (Math.random()-.5)*.015};
-    } else {
-      hitIds = new Set();
-      // Fallback: If no RAG docs match, visually move the star to the 16D semantic space anyway!
-      const emb16 = textToEmbedding(question);
-      fetch(`${API}/search?v=${emb16.join(',')}&k=3&metric=cosine&algo=hnsw`)
-        .then(res2=>res2.json())
-        .then(data2 => {
-          if (data2.results && data2.results.length>0) {
-            let sx=0,sy=0,sw=0;
-            for (let i=0;i<Math.min(3,data2.results.length);i++) {
-              const pt=pcaPoints.find(p=>p.item.id===data2.results[i].id);
-              if(pt){const w=1/(i+1);sx+=pt.x*w;sy+=pt.y*w;sw+=w;}
-            }
-            if(sw>0) queryPt={x:sx/sw+(Math.random()-.5)*.015,y:sy/sw+(Math.random()-.5)*.015};
-          }
-        }).catch(()=>{});
-    }
-  }).catch(()=>{});
-
-  try {
-    // Phase 3: use hybrid search endpoint if hybrid mode is active
-    const endpoint = searchMode === 'hybrid' ? '/doc/hybrid-search' : '/doc/ask';
-    const r=await fetch(API+endpoint,{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({question,k})
-    });
-    const d=await r.json();
-    thinkDiv.remove();
-
-    const aDiv=document.createElement('div'); aDiv.className='chat-a';
-
-    if (d.error) {
-      aDiv.innerHTML=`<div class="chat-a-label">ERROR</div><div class="chat-a-text" style="color:var(--red)">${d.error}</div>`;
-      history.appendChild(aDiv);
-    } else if (searchMode === 'hybrid') {
-      // Hybrid search result display (no LLM answer — just ranked chunks)
-      const modeLabel = d.searchType || 'hybrid';
-      let ctxHtml = (d.results||[]).map((c,i) =>
-        `<span class="ctx-chip" onclick="toggleCtx(${i})">#${i+1} ${c.title} · RRF:${(c.rrfScore||0).toFixed(4)}</span>`+
-        `<div class="ctx-expand" id="ctx-${i}">${c.preview||''}</div>`
-      ).join('');
-      aDiv.innerHTML=`<div class="chat-a-label" style="color:var(--food)">⚡ ${modeLabel.toUpperCase()}</div>`+
-        `<div class="chat-a-text" style="margin-bottom:8px;font-size:11px;color:var(--muted)">Retrieved ${d.count} chunks via Reciprocal Rank Fusion. Switch to VECTOR ONLY mode to get an AI-generated answer.</div>`+
-        `<div class="chat-ctx"><div class="chat-ctx-label">RANKED CHUNKS (BM25 + HNSW)</div>${ctxHtml}</div>`;
-      history.appendChild(aDiv);
-    } else {
-      // Build answer block with typewriter
-      aDiv.innerHTML=`<div class="chat-a-label">🤖 ${d.model||'llm'}</div>`+
-        `<div class="chat-a-text" id="typeTarget"></div>`+
-        `<div class="chat-ctx">`+
-          `<div class="chat-ctx-label">RETRIEVED CONTEXT (${d.contexts.length} chunks)</div>`+
-          d.contexts.map((c,i)=>`<span class="ctx-chip" onclick="toggleCtx(${i})">#${i+1} ${c.title} · ${c.distance.toFixed(3)}</span>`+
-            `<div class="ctx-expand" id="ctx-${i}">${c.text}</div>`).join('')+
-        `</div>`;
-      history.appendChild(aDiv);
-
-      // Typewriter effect
-      const target=aDiv.querySelector('#typeTarget');
-      target.classList.add('typing');
-      const full=d.answer; let i=0;
-      const timer=setInterval(()=>{
-        if(i>=full.length){clearInterval(timer);target.classList.remove('typing');return;}
-        const chunk=full.slice(i,i+3); target.textContent+=chunk; i+=3;
-        history.scrollTop=history.scrollHeight;
-      },18);
-    }
-
-  } catch(e) {
-    thinkDiv.remove();
-    const err=document.createElement('div');err.className='chat-a';
-    err.innerHTML='<div class="chat-a-label">ERROR</div><div class="chat-a-text" style="color:var(--red)">Server error — is the backend running?</div>';
-    history.appendChild(err);
-  }
-
-  document.getElementById('ragQuestion').value='';
-  btn.disabled=false; btn.textContent='🤖 ASK AI';
-  history.scrollTop=history.scrollHeight;
-}
-
-function toggleCtx(i) {
-  const el=document.getElementById('ctx-'+i);
-  el.style.display=el.style.display==='block'?'none':'block';
-}
-
 // ════════════════════════════════════════════════════════════
 //  BOOT
 // ════════════════════════════════════════════════════════════
 resize(); drawFrame();
 loadItems().then(loadHNSW);
 checkOllamaStatus();
-loadSystemStats();  // Phase 3: pre-load system tab data
+loadSystemStats();
 </script>
 </body>
 </html>

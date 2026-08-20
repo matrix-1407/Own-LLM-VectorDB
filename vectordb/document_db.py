@@ -9,17 +9,27 @@ Phase 3 additions
 - hybrid_search() — merges HNSW vector scores and BM25 keyword scores
   via Reciprocal Rank Fusion (RRF).
 - SQ8Index for memory-compressed flat search (used when n < 10).
+
+Phase 4 additions
+-----------------
+- advanced_search() — orchestrates multi-stage retrieval pipelines:
+  * "vector"  : Standard HNSW vector search
+  * "hybrid"  : BM25 + HNSW with Reciprocal Rank Fusion
+  * "rerank"  : 2-stage retrieval (Oversample candidates -> Cross/LLM Rerank)
+  * "hyde"    : Hypothetical Document Embeddings query expansion
 """
 
 import threading
-from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass, field
+from typing import Callable, Dict, List, Optional, Tuple
 
 from vectordb.metrics import cosine
 from vectordb.algorithms.brute_force import BruteForce, VectorItem
 from vectordb.algorithms.hnsw import HNSW
 from vectordb.bm25 import BM25Index
 from vectordb.quantization import SQ8Index
+from vectordb.reranker import RerankItem, rerank_candidates
+from vectordb.hyde import generate_hypothetical_doc
 
 
 @dataclass
@@ -28,6 +38,15 @@ class DocItem:
     title: str
     text: str
     emb: List[float]
+
+
+@dataclass
+class AdvancedSearchResult:
+    pipeline: str
+    results: List[Tuple[float, DocItem]]  # (score_or_dist, DocItem)
+    rerank_items: List[RerankItem]        # Populated if pipeline == "rerank"
+    hyde_doc: Optional[str]               # Populated if pipeline == "hyde"
+    candidate_count: int
 
 
 # ── Reciprocal Rank Fusion ─────────────────────────────────────────────────────
@@ -111,7 +130,6 @@ class DocumentDB:
     ) -> List[Tuple[float, DocItem]]:
         """
         Pure vector (HNSW / SQ8) semantic search.
-
         Returns list of (distance, DocItem) sorted by ascending distance.
         """
         with self._lock:
@@ -148,17 +166,7 @@ class DocumentDB:
     ) -> List[Tuple[float, DocItem]]:
         """
         Hybrid BM25 + HNSW search merged via Reciprocal Rank Fusion.
-
-        Parameters
-        ----------
-        query_text : str    — original question text for BM25 keyword scoring
-        query_emb  : list   — 768-D embedding of the question for HNSW scoring
-        k          : int    — number of results to return
-        rrf_k      : int    — RRF smoothing constant (default 60)
-
-        Returns
-        -------
-        List of (rrf_score, DocItem) sorted descending by RRF score.
+        Returns list of (rrf_score, DocItem) sorted descending by RRF score.
         """
         with self._lock:
             if not self._store:
@@ -180,6 +188,113 @@ class DocumentDB:
                 if id_ in self._store:
                     results.append((score, self._store[id_]))
             return results
+
+    # ── Advanced Multi-Pipeline Search (Phase 4) ──────────────────────────────
+
+    def advanced_search(
+        self,
+        query_text: str,
+        query_emb_fn: Callable[[str], List[float]],
+        k: int = 3,
+        pipeline: str = "vector",            # "vector", "hybrid", "rerank", "hyde"
+        rerank_strategy: str = "cross",       # "cross" or "llm"
+        ollama_generate_fn: Optional[Callable[[str], str]] = None,
+        candidate_k: int = 10,
+    ) -> AdvancedSearchResult:
+        """
+        Executes an advanced multi-stage retrieval pipeline.
+
+        Pipelines:
+        - "vector" : Standard HNSW vector search.
+        - "hybrid" : BM25 + HNSW merged via Reciprocal Rank Fusion.
+        - "rerank" : Stage 1 oversampling -> Stage 2 Cross/LLM Re-ranking.
+        - "hyde"   : Generate hypothetical document -> embed -> HNSW search.
+        """
+        with self._lock:
+            if not self._store:
+                return AdvancedSearchResult(
+                    pipeline=pipeline,
+                    results=[],
+                    rerank_items=[],
+                    hyde_doc=None,
+                    candidate_count=0,
+                )
+
+        hyde_doc: Optional[str] = None
+
+        if pipeline == "hyde":
+            # 1. Generate hypothetical doc
+            if ollama_generate_fn:
+                hyde_doc = generate_hypothetical_doc(query_text, ollama_generate_fn)
+            else:
+                hyde_doc = query_text
+
+            # 2. Embed hypothetical doc
+            h_emb = query_emb_fn(hyde_doc)
+            if not h_emb:
+                h_emb = query_emb_fn(query_text)
+
+            # 3. Vector search using hypothetical vector
+            hits = self.search(h_emb, k=k)
+            return AdvancedSearchResult(
+                pipeline="hyde",
+                results=hits,
+                rerank_items=[],
+                hyde_doc=hyde_doc,
+                candidate_count=len(hits),
+            )
+
+        elif pipeline == "hybrid":
+            q_emb = query_emb_fn(query_text)
+            hits = self.hybrid_search(query_text, q_emb, k=k)
+            return AdvancedSearchResult(
+                pipeline="hybrid",
+                results=hits,
+                rerank_items=[],
+                hyde_doc=None,
+                candidate_count=len(hits),
+            )
+
+        elif pipeline == "rerank":
+            # Stage 1: Oversample candidates using hybrid search
+            q_emb = query_emb_fn(query_text)
+            oversample_k = min(max(candidate_k, k * 3), len(self._store))
+            candidates = self.hybrid_search(query_text, q_emb, k=oversample_k)
+
+            # Stage 2: Cross/LLM Rerank
+            rerank_items = rerank_candidates(
+                query=query_text,
+                candidates=candidates,
+                strategy=rerank_strategy,
+                ollama_generate_fn=ollama_generate_fn,
+                top_k=k,
+            )
+
+            # Map rerank items back to results
+            with self._lock:
+                final_results = []
+                for item in rerank_items:
+                    if item.id in self._store:
+                        final_results.append((item.rerank_score, self._store[item.id]))
+
+            return AdvancedSearchResult(
+                pipeline="rerank",
+                results=final_results,
+                rerank_items=rerank_items,
+                hyde_doc=None,
+                candidate_count=len(candidates),
+            )
+
+        else:  # "vector"
+            q_emb = query_emb_fn(query_text)
+            hits = self.search(q_emb, k=k)
+            return AdvancedSearchResult(
+                pipeline="vector",
+                results=hits,
+                rerank_items=[],
+                hyde_doc=None,
+                candidate_count=len(hits),
+            )
 
     # ── Remove ────────────────────────────────────────────────────────────────
 
