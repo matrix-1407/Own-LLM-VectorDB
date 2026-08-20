@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>VectorDB — HNSW + RAG</title>
+<title>VectorDB — HNSW + RAG + Hybrid Search</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -155,6 +155,23 @@ button {
 ::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── PHASE 3: SYSTEM TAB ── */
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.stat-card { background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; }
+.stat-val  { font-size: 20px; font-weight: 600; color: var(--accent); margin-bottom: 2px; }
+.stat-lbl  { font-size: 9px; letter-spacing: 1px; color: var(--muted); }
+.persist-card { background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 12px; font-size: 11px; line-height: 1.8; }
+.persist-card.ok { border-color: rgba(166,227,161,.3); }
+.persist-card.no { border-color: rgba(108,99,255,.25); }
+
+/* ── PHASE 3: HYBRID TOGGLE ── */
+.mode-row { display: flex; gap: 5px; }
+.mode-btn { flex: 1; padding: 7px 4px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); font-size: 10px; cursor: pointer; text-align: center; transition: all .2s; letter-spacing: .5px; font-family: inherit; }
+.mode-btn.on { border-color: var(--green); color: var(--green); background: rgba(166,227,161,.1); }
+.btn-y { background: rgba(255,183,77,.12); color: var(--food); border: 1px solid rgba(255,183,77,.3); }
+.btn-y:hover { background: rgba(255,183,77,.22); }
+.btn-y:disabled { opacity:.5;cursor:wait; }
 </style>
 </head>
 <body>
@@ -164,6 +181,8 @@ button {
   <span class="badge hl">HNSW</span>
   <span class="badge">KD-TREE</span>
   <span class="badge">BRUTE FORCE</span>
+  <span class="badge hl" style="border-color:rgba(255,183,77,.5);color:var(--food);background:rgba(255,183,77,.08)">SQ8</span>
+  <span class="badge hl" style="border-color:rgba(166,227,161,.5);color:var(--green);background:rgba(166,227,161,.08)">BM25+RRF</span>
   <span class="badge" id="ollamaBadge">OLLAMA…</span>
   <span id="statsLabel">loading…</span>
 </header>
@@ -224,8 +243,24 @@ button {
       </div>
     </div>
     <div>
+      <div class="sec">Category Filter</div>
+      <select id="catFilter">
+        <option value="">All Categories</option>
+        <option value="cs">CS / Algorithms</option>
+        <option value="math">Mathematics</option>
+        <option value="food">Food &amp; Cooking</option>
+        <option value="sports">Sports &amp; Games</option>
+        <option value="doc">Documents (RAG)</option>
+      </select>
+    </div>
+    <div>
       <div class="sec">Benchmark</div>
       <button class="btn-s" onclick="runBenchmark()">▶ COMPARE ALL ALGOS</button>
+    </div>
+    <div>
+      <div class="sec">Persistence</div>
+      <button class="btn-y" id="saveBtn" onclick="saveToDisk()">💾 SAVE TO DISK</button>
+      <div id="saveStatus" style="font-size:10px;color:var(--muted);margin-top:5px"></div>
     </div>
   </div>
 
@@ -238,6 +273,7 @@ button {
       <div class="tab on"  onclick="switchTab('search')">SEARCH</div>
       <div class="tab"     onclick="switchTab('docs')">DOCUMENTS</div>
       <div class="tab"     onclick="switchTab('rag')">ASK AI</div>
+      <div class="tab"     onclick="switchTab('system')">SYSTEM</div>
     </div>
 
     <!-- TAB: SEARCH -->
@@ -295,6 +331,14 @@ button {
     <!-- TAB: ASK AI (RAG) -->
     <div class="tab-content" id="tab-rag">
       <div>
+        <div class="sec">Search Mode</div>
+        <div class="mode-row">
+          <div class="mode-btn on" id="modeVector" onclick="setSearchMode('vector')">🔬 VECTOR ONLY</div>
+          <div class="mode-btn"    id="modeHybrid" onclick="setSearchMode('hybrid')">⚡ HYBRID BM25+HNSW</div>
+        </div>
+        <div id="hybridNote" style="display:none;font-size:9px;color:var(--muted);margin-top:5px;line-height:1.5">Combines keyword (BM25) + semantic (HNSW) via Reciprocal Rank Fusion. Best for exact terms + conceptual queries.</div>
+      </div>
+      <div>
         <div class="sec">Ask a Question</div>
         <div style="display:flex;flex-direction:column;gap:8px">
           <textarea id="ragQuestion" rows="3" placeholder="What is dynamic programming?&#10;Explain the main idea of HNSW.&#10;How does the recipe differ from…"></textarea>
@@ -313,6 +357,38 @@ button {
         <div class="sec">Conversation</div>
         <div class="chat-history" id="chatHistory">
           <div style="color:var(--muted);font-size:11px">Ask a question about your inserted documents…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: SYSTEM (Phase 3) -->
+    <div class="tab-content" id="tab-system">
+      <div>
+        <div class="sec">Index Statistics</div>
+        <div class="stat-grid" id="sysStats">
+          <div class="stat-card"><div class="stat-val" id="sysVecCount">—</div><div class="stat-lbl">DEMO VECTORS</div></div>
+          <div class="stat-card"><div class="stat-val" id="sysDocCount">—</div><div class="stat-lbl">DOC CHUNKS</div></div>
+          <div class="stat-card"><div class="stat-val" id="sysCmpRatio">4×</div><div class="stat-lbl">SQ8 COMPRESSION</div></div>
+          <div class="stat-card"><div class="stat-val" id="sysBm25Tokens">—</div><div class="stat-lbl">BM25 TOKENS</div></div>
+        </div>
+      </div>
+      <div>
+        <div class="sec">SQ8 Memory Savings (Demo Index)</div>
+        <div id="sq8Details" class="persist-card">Loading…</div>
+      </div>
+      <div>
+        <div class="sec">Disk Persistence</div>
+        <button class="btn-y" onclick="saveToDisk()" style="margin-bottom:8px">💾 SAVE INDEXES NOW</button>
+        <div id="persistStatus" class="persist-card">Loading…</div>
+      </div>
+      <div>
+        <div class="sec">Active Features (Phase 3)</div>
+        <div style="font-size:11px;line-height:2;color:var(--muted)">
+          <div>✅ <span style="color:var(--text)">Disk Persistence</span> — auto save/load on restart</div>
+          <div>✅ <span style="color:var(--text)">SQ8 Compression</span> — float32 → int8 (4× smaller)</div>
+          <div>✅ <span style="color:var(--text)">BM25 Index</span> — keyword search over documents</div>
+          <div>✅ <span style="color:var(--text)">Hybrid Search</span> — BM25 + HNSW via RRF fusion</div>
+          <div>✅ <span style="color:var(--text)">Category Filter</span> — single-stage HNSW filtering</div>
         </div>
       </div>
     </div>
@@ -337,18 +413,30 @@ const DIM_COL = ['#00d9ff','#00d9ff','#00d9ff','#00d9ff','#b388ff','#b388ff','#b
 // ════════════════════════════════════════════════════════════
 let allItems = [], pcaPoints = [], hitIds = new Set(), queryPt = null;
 let hoverItem = null, pulse = 0, selAlgo = 'hnsw', searchResults = [];
+let searchMode = 'vector'; // 'vector' or 'hybrid'
 
 // ════════════════════════════════════════════════════════════
 //  TABS
 // ════════════════════════════════════════════════════════════
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach((t,i) => {
-    const names = ['search','docs','rag'];
+    const names = ['search','docs','rag','system'];
     t.classList.toggle('on', names[i] === name);
   });
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('on'));
   document.getElementById('tab-' + name).classList.add('on');
   if (name === 'docs') loadDocList();
+  if (name === 'system') loadSystemStats();
+}
+
+// ════════════════════════════════════════════════════════════
+//  PHASE 3: SEARCH MODE (hybrid / vector)
+// ════════════════════════════════════════════════════════════
+function setSearchMode(mode) {
+  searchMode = mode;
+  document.getElementById('modeVector').classList.toggle('on', mode === 'vector');
+  document.getElementById('modeHybrid').classList.toggle('on', mode === 'hybrid');
+  document.getElementById('hybridNote').style.display = mode === 'hybrid' ? 'block' : 'none';
 }
 
 // ════════════════════════════════════════════════════════════
@@ -532,13 +620,16 @@ async function runSearch() {
   const text=document.getElementById('qInput').value.trim(); if(!text)return;
   const emb=textToEmbedding(text),k=parseInt(document.getElementById('kSlider').value);
   const metric=document.getElementById('metric').value;
-  const url=`${API}/search?v=${emb.join(',')}&k=${k}&metric=${metric}&algo=${selAlgo}`;
+  const cat=document.getElementById('catFilter').value;  // Phase 3: category filter
+  let url=`${API}/search?v=${emb.join(',')}&k=${k}&metric=${metric}&algo=${selAlgo}`;
+  if (cat) url += `&category=${encodeURIComponent(cat)}`;
   try {
     const r=await fetch(url), data=await r.json();
     searchResults=data.results||[]; hitIds=new Set(searchResults.map(r=>r.id));
     const us=data.latencyUs||0;
     document.getElementById('latBig').textContent=us<1000?us+' μs':(us/1000).toFixed(2)+' ms';
-    document.getElementById('latSub').textContent=selAlgo.toUpperCase()+'  ·  '+metric+'  ·  k='+k;
+    const filterStr = data.categoryFilter ? `  ·  filter:${data.categoryFilter}` : '';
+    document.getElementById('latSub').textContent=selAlgo.toUpperCase()+'  ·  '+metric+'  ·  k='+k+filterStr;
     if (searchResults.length>0){
       let sx=0,sy=0,sw=0;
       for (let i=0;i<Math.min(3,searchResults.length);i++){
@@ -734,6 +825,73 @@ document.getElementById('ragQuestion').addEventListener('keydown',e=>{
   if(e.key==='Enter'&&e.ctrlKey)askAI();
 });
 
+// ════════════════════════════════════════════════════════════
+//  PHASE 3: SAVE TO DISK
+// ════════════════════════════════════════════════════════════
+async function saveToDisk() {
+  const btn = document.getElementById('saveBtn');
+  const status = document.getElementById('saveStatus');
+  if (btn) { btn.disabled=true; btn.textContent='Saving…'; }
+  try {
+    const r = await fetch(API+'/persist/save', {method:'POST'});
+    const d = await r.json();
+    const msg = `✓ Saved ${d.savedVectors} vectors + ${d.savedDocs} docs`;
+    if (status) status.innerHTML = `<span style="color:var(--green)">${msg}</span>`;
+    if (btn) btn.textContent = '💾 SAVE TO DISK';
+    loadSystemStats();
+  } catch(_) {
+    if (status) status.innerHTML = '<span style="color:var(--red)">✗ Save failed</span>';
+    if (btn) btn.textContent = '💾 SAVE TO DISK';
+  }
+  if (btn) btn.disabled=false;
+}
+
+// ════════════════════════════════════════════════════════════
+//  PHASE 3: SYSTEM STATS
+// ════════════════════════════════════════════════════════════
+async function loadSystemStats() {
+  try {
+    const [sR, pR] = await Promise.all([
+      fetch(API+'/stats'),
+      fetch(API+'/persist/status')
+    ]);
+    const s = await sR.json();
+    const p = await pR.json();
+
+    // Counts
+    document.getElementById('sysVecCount').textContent = s.count || 0;
+    document.getElementById('sysDocCount').textContent = (s.docIndex?.chunkCount) || 0;
+    document.getElementById('sysCmpRatio').textContent = (s.sq8?.compressionRatio || 4).toFixed(1) + '×';
+    document.getElementById('sysBm25Tokens').textContent = s.docIndex?.bm25TokenCount || 0;
+
+    // SQ8 detail
+    const sq8 = s.sq8 || {};
+    document.getElementById('sq8Details').innerHTML =
+      `<span style="color:var(--food)">● float32 → int8</span><br>` +
+      `Ratio: <span style="color:var(--text)">${(sq8.compressionRatio||4).toFixed(2)}×</span><br>` +
+      `float32 usage: <span style="color:var(--muted)">${fmtBytes(sq8.float32Bytes||0)}</span><br>` +
+      `int8 usage:   <span style="color:var(--muted)">${fmtBytes(sq8.int8Bytes||0)}</span><br>` +
+      `Saved:         <span style="color:var(--green)">${fmtBytes(sq8.savedBytes||0)}</span>`;
+
+    // Persistence
+    const vs = p.vectorSnapshot, ds = p.documentSnapshot;
+    document.getElementById('persistStatus').innerHTML =
+      `<b style="color:var(--text)">Vector Index</b><br>` +
+      `Path: <span style="color:var(--muted)">${vs.path}</span><br>` +
+      `Status: ${vs.exists ? `<span style="color:var(--green)">● Saved (${fmtBytes(vs.sizeBytes)})</span>` : '<span style="color:var(--muted)">Not saved yet</span>'}<br><br>` +
+      `<b style="color:var(--text)">Document Index</b><br>` +
+      `Path: <span style="color:var(--muted)">${ds.path}</span><br>` +
+      `Status: ${ds.exists ? `<span style="color:var(--green)">● Saved (${fmtBytes(ds.sizeBytes)})</span>` : '<span style="color:var(--muted)">Not saved yet</span>'}`;
+    document.getElementById('persistStatus').className = 'persist-card ' + (vs.exists || ds.exists ? 'ok' : 'no');
+  } catch(_) {}
+}
+
+function fmtBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(2) + ' MB';
+}
+
 async function askAI() {
   const question=document.getElementById('ragQuestion').value.trim();
   if(!question)return;
@@ -794,7 +952,9 @@ async function askAI() {
   }).catch(()=>{});
 
   try {
-    const r=await fetch(API+'/doc/ask',{
+    // Phase 3: use hybrid search endpoint if hybrid mode is active
+    const endpoint = searchMode === 'hybrid' ? '/doc/hybrid-search' : '/doc/ask';
+    const r=await fetch(API+endpoint,{
       method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({question,k})
     });
@@ -805,6 +965,18 @@ async function askAI() {
 
     if (d.error) {
       aDiv.innerHTML=`<div class="chat-a-label">ERROR</div><div class="chat-a-text" style="color:var(--red)">${d.error}</div>`;
+      history.appendChild(aDiv);
+    } else if (searchMode === 'hybrid') {
+      // Hybrid search result display (no LLM answer — just ranked chunks)
+      const modeLabel = d.searchType || 'hybrid';
+      let ctxHtml = (d.results||[]).map((c,i) =>
+        `<span class="ctx-chip" onclick="toggleCtx(${i})">#${i+1} ${c.title} · RRF:${(c.rrfScore||0).toFixed(4)}</span>`+
+        `<div class="ctx-expand" id="ctx-${i}">${c.preview||''}</div>`
+      ).join('');
+      aDiv.innerHTML=`<div class="chat-a-label" style="color:var(--food)">⚡ ${modeLabel.toUpperCase()}</div>`+
+        `<div class="chat-a-text" style="margin-bottom:8px;font-size:11px;color:var(--muted)">Retrieved ${d.count} chunks via Reciprocal Rank Fusion. Switch to VECTOR ONLY mode to get an AI-generated answer.</div>`+
+        `<div class="chat-ctx"><div class="chat-ctx-label">RANKED CHUNKS (BM25 + HNSW)</div>${ctxHtml}</div>`;
+      history.appendChild(aDiv);
     } else {
       // Build answer block with typewriter
       aDiv.innerHTML=`<div class="chat-a-label">🤖 ${d.model||'llm'}</div>`+
@@ -826,9 +998,6 @@ async function askAI() {
         history.scrollTop=history.scrollHeight;
       },18);
     }
-
-    if (!d.error) { /* already appended above */ }
-    else history.appendChild(aDiv);
 
   } catch(e) {
     thinkDiv.remove();
@@ -853,6 +1022,7 @@ function toggleCtx(i) {
 resize(); drawFrame();
 loadItems().then(loadHNSW);
 checkOllamaStatus();
+loadSystemStats();  // Phase 3: pre-load system tab data
 </script>
 </body>
 </html>

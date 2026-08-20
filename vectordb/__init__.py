@@ -1,8 +1,10 @@
 """
-VectorDB Python Package
-=======================
+VectorDB Python Package (v2.0.0)
+================================
 A vector database engine built from scratch in Python.
-Implements HNSW, KD-Tree, and BruteForce search algorithms
-with a local Ollama RAG pipeline.
+
+Phase 2: HNSW, KD-Tree, BruteForce, Ollama RAG pipeline.
+Phase 3: Disk Persistence, SQ8 Quantization, BM25 Hybrid Search,
+         Metadata Filtering, Category-filtered vector search.
 """
-__version__ = "1.0.0"
+__version__ = "2.0.0"

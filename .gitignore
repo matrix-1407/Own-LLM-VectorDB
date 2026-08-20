@@ -22,12 +22,5 @@ env/
 Thumbs.db
 
 # Local helper / planning docs (not for GitHub)
-instructions.md
-design.md
-working.md
-tech_stack.md
-remember.md
-future_scope.md
-task.md
-implementation_plan.md
-walkthrough.md
+.github
+/remember.md
