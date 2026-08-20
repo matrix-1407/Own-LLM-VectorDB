@@ -248,7 +248,6 @@ VectorDB/
 - [x] **Phase 3**: Engine upgrades (Disk persistence, SQ8 quantization, BM25 hybrid search, metadata filtering)
 - [x] **Phase 4**: Advanced RAG (Semantic chunking, Two-stage re-ranking, Sentence grounding & citations, HyDE)
 - [x] **Phase 5**: Visualization & Introspection (3D vector visualizer, stacked HNSW graph inspector, search trajectory tracer, metric space geometry)
-- [ ] **Future Scope**: Multi-tenant collections & Docker deployment (to be explored in future milestones)
 
 ---
 
